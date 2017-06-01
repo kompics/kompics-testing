@@ -71,8 +71,8 @@ public class UnorderedEventsTest {
     tc.connect(pingerPort, ponger2.getPositive(PingPongPort.class));
     tc.connect(pingerPort, ponger3.getPositive(PingPongPort.class));
 
-    tc.addComparator(Ping.class, new PingComparator()).
-       addComparator(Pong.class, new PongComparator());
+    tc.setComparator(Ping.class, new PingComparator()).
+        setComparator(Pong.class, new PongComparator());
   }
 
   private void connectTimers() {

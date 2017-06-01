@@ -53,7 +53,7 @@ public class EPFDTest {
   @Test
   public void mockNetworkAndTimer() {
 
-    tc.addComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
+    tc.setComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
        body();
     // Expect initial SCHED TIMEOUT
     tc.expect(st, epfd.getNegative(Timer.class), OUT);
@@ -105,8 +105,8 @@ public class EPFDTest {
     tc.connect(ponger.getNegative(Network.class), networkPonger.getPositive(Network.class));
 
     tc.
-       setTimeout(600).
-       addComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
+       setTimeout(3000).
+        setComparator(ScheduleTimeout.class, new ScheduleTimeoutComparator()).
        disallow(restore, epfd.getPositive(EPFDPort.class), OUT).
        body();
 

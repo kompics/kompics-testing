@@ -58,7 +58,7 @@ class NFA {
 
   private RepeatFA repeatMain;
   private Set<State> currentStates = new HashSet<State>();
-  private final State errorState = new State(nextid(), null);
+  private final State errorState;
   private Logger logger = TestContext.logger;
   private FA currentFA;
   private Stack<FA> previousFA = new Stack<FA>();
@@ -68,10 +68,11 @@ class NFA {
     repeatMain = new RepeatFA(1, initialBlock);
     currentFA = repeatMain;
     previousFA.push(repeatMain);
+    errorState = new State(0, initialBlock);
   }
 
   private int nextid() {
-    return stateIDs++;
+    return ++stateIDs;
   }
 
   <E extends KompicsEvent> void setDefaultAction(Class<E> eventType, Function<E, Action> predicate) {
@@ -166,6 +167,10 @@ class NFA {
     return false;
   }
 
+  private boolean inErrorState() {
+    return currentStates.size() == 1 && currentStates.contains(errorState);
+  }
+
   boolean doTransition(EventSpec receivedSpec) {
     logger.debug("{}: received event {}", currentStates, receivedSpec);
     while (true) {
@@ -177,7 +182,7 @@ class NFA {
       }
 
       if (!nextStates.isEmpty()) {
-        return true;
+        return !inErrorState();
       } else {
         // check if any current state is an internal action
         // if found kill those that aren't and retry handle received spec
@@ -187,7 +192,7 @@ class NFA {
           updateCurrentState(nextStates);
 
           if (receivedSpec == null) { // retry event queue
-            return true;
+            return !inErrorState();
           } else {
             continue;
           }
@@ -200,7 +205,7 @@ class NFA {
       // try registered default actions
       boolean handleByDefault = tryDefaultActions(receivedSpec);
       if (handleByDefault) {
-        return true;
+        return !inErrorState();
       }
 
       if (receivedSpec == null) {
@@ -770,7 +775,9 @@ class NFA {
 
     @Override
     public String toString() {
-      //return id.toString();
+      if (this == errorState) {
+        return "Error State";
+      }
       return Integer.toString(id);
     }
 

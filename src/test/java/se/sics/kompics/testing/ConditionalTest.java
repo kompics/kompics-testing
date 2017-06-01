@@ -46,8 +46,8 @@ public class ConditionalTest {
   private Positive<PingPongPort> pongerPort = ponger.getPositive(PingPongPort.class);
   {
     tc.connect(pingerPort, pongerPort);
-    tc.addComparator(Ping.class, new PingComparator());
-    tc.addComparator(Pong.class, new PongComparator());
+    tc.setComparator(Ping.class, new PingComparator());
+    tc.setComparator(Pong.class, new PongComparator());
   }
 
   @Test

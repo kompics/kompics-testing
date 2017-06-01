@@ -43,8 +43,8 @@ public class PredicateTest {
     Ping allowedPing = ping(10);
     tc.connect(pingerPort, pongerPort);
     tc.
-      addComparator(Pong.class, new PongComparator()).
-      addComparator(Ping.class, new PingComparator()).
+        setComparator(Pong.class, new PongComparator()).
+        setComparator(Ping.class, new PingComparator()).
       //disallow(new Pong(1), pingerPort, incoming).
       allow(allowedPing, pingerPort, outgoing).
 

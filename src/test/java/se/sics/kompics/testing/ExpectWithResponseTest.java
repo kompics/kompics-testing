@@ -186,7 +186,7 @@ public class ExpectWithResponseTest {
           ids.add(id);
           trigger(new Ping(id), ppPort);
         }
-        // trigger a negative ping id
+        // trigger a negative ping count
         trigger(new Ping(-random.nextInt(100)), ppPort);
       }
     };

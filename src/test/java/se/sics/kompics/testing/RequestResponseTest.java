@@ -56,7 +56,7 @@ public class RequestResponseTest {
       connect(pinger2.getNegative(PingPongPort.class), ponger2.getPositive(PingPongPort.class));
 
     tc.
-      addComparator(Ping.class, new PingComparator()).
+        setComparator(Ping.class, new PingComparator()).
       body().
       repeat(10).body().
         expect(new Ping(count), pinger.getNegative(PingPongPort.class), outgoing).
@@ -80,7 +80,7 @@ public class RequestResponseTest {
     tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class));
     tc.connect(pinger2.getNegative(PingPongPort.class), ponger2.getPositive(PingPongPort.class));
 
-    tc.addComparator(Ping.class, new PingComparator()).body();
+    tc.setComparator(Ping.class, new PingComparator()).body();
 
     //// TODO: 2/21/17 write testcase for 1-to-1 channel forwarding on outbound - response
     tc.

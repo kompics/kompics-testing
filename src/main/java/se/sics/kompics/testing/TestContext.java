@@ -83,6 +83,10 @@ public class TestContext<T extends ComponentDefinition> {
     checkNotNull(definition, initEvent);
     return new TestContext<T>(definition, initEvent);
   }
+  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
+      Class<T> definition) {
+    return newTestContext(definition, Init.NONE);
+  }
 
   public static <T extends ComponentDefinition> TestContext<T> newTestContext(
       Class<T> definition, Init.None initEvent) {
@@ -96,6 +100,10 @@ public class TestContext<T extends ComponentDefinition> {
     Component c = proxy.createSetupComponent(definition, initEvent);
     ctrl.addParticipant(c);
     return c;
+  }
+
+  public <T extends ComponentDefinition> Component create(Class<T> definition) {
+    return create(definition, Init.NONE);
   }
 
   public <T extends ComponentDefinition> Component create(
@@ -299,7 +307,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public <E extends KompicsEvent> TestContext<T> addComparator(
+  public <E extends KompicsEvent> TestContext<T> setComparator(
           Class<E> eventType, Comparator<E> comparator) {
     checkNotNull(eventType, comparator);
     ctrl.addComparator(eventType, comparator);

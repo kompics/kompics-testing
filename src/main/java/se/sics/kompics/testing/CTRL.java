@@ -38,6 +38,7 @@ import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Fault;
+import se.sics.kompics.JavaComponent;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
@@ -316,12 +317,24 @@ class CTRL<T extends ComponentDefinition> {
       table.tryInternalEventTransitions();
       EventSpec receivedSpec = removeEventFromQueue();
       if (receivedSpec == null && table.isInFinalState()) {
-        //logger.debug("final state");
+        // wait until all events have been handled by cut
+        checkWorkCount();
         return true;
       }
       boolean successful = table.doTransition(receivedSpec);
       if (!successful && !table.isInFinalState()) {
         return false;
+      }
+    }
+  }
+
+  private void checkWorkCount() {
+    JavaComponent cut = (JavaComponent) proxyComponent;
+    while (cut.workCount.get() > 0) {
+      try {
+        Thread.sleep(20);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
     }
   }
