@@ -72,6 +72,10 @@ class PortStructure {
     return outboundPort;
   }
 
+  Port<? extends PortType> getInboundPort() {
+    return inboundPort;
+  }
+
   <P extends PortType> void addConnectedPort(PortCore<P> connectedPort, ChannelFactory factory) {
     Channel<P> channel;
 

@@ -706,7 +706,7 @@ class NFA {
 
     private Collection<Transition> getLoopEndTransition() {
       if (!block.hasPendingEvents()) {
-        logger.debug("end{} count = {}", block, block.getCurrentCount());
+        logger.trace("end{} count = {}", block, block.getCurrentCount());
 
         block.iterationComplete(); // decrement loop count (for kleene closure disable block)
 

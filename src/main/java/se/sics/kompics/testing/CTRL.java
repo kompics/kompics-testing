@@ -316,16 +316,23 @@ class CTRL<T extends ComponentDefinition> {
     while (true) {
       table.tryInternalEventTransitions();
       EventSpec receivedSpec = removeEventFromQueue();
-      if (receivedSpec == null && table.isInFinalState()) {
-        // wait until all events have been handled by cut
-        checkWorkCount();
+      if (inFinalState(receivedSpec)) {
         return true;
       }
       boolean successful = table.doTransition(receivedSpec);
-      if (!successful && !table.isInFinalState()) {
-        return false;
+      if (!successful) {
+        return inFinalState(receivedSpec);
       }
     }
+  }
+
+  private boolean inFinalState(EventSpec receivedSpec) {
+    if (receivedSpec == null && table.isInFinalState()) {
+      // wait until all events have been handled by cut
+      checkWorkCount();
+      return true;
+    }
+    return false;
   }
 
   private void checkWorkCount() {

@@ -21,6 +21,7 @@
 package se.sics.kompics.testing;
 
 import se.sics.kompics.ChannelCore;
+import se.sics.kompics.Direct;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
@@ -49,6 +50,12 @@ class OutBoundHandler extends ProxyHandler {
     if (event instanceof Request) {
       Request request = (Request) event;
       request.pushPathElement(proxy.getComponentCore());
+    }
+
+    if (event instanceof Direct.Request) {
+      Direct.Request request = (Direct.Request) event;
+      //// TODO: 6/1/17 not public
+      request.setOrigin(portStruct.getInboundPort().getPair());
     }
 
     EventSpec eventSpec = proxy.getFsm().newEventSpec(event, sourcePort, Direction.OUT);
