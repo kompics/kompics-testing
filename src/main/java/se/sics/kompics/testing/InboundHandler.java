@@ -54,7 +54,7 @@ class InboundHandler extends ProxyHandler {
 
     if (event instanceof Direct.Request) {
       Direct.Request request = (Direct.Request) event;
-      setupDirectRequest(request, request.getOrigin());
+      setupDirectRequest(request, Unsafe.getOrigin(request));
     }
 
     EventSpec eventSpec = proxy.getFsm().newEventSpec(event, destPort, Direction.IN);
@@ -77,8 +77,8 @@ class InboundHandler extends ProxyHandler {
       assert portType == origin.getPortType();
       // // TODO: 6/1/17 javaport constructor is not public in Kompics
       boolean isPositive = portStruct.isProvidedPort;
-      ghostOutsidePort = new JavaPort<P>(!isPositive, origin.getPortType(), proxy.getComponentCore());
-      JavaPort<P> ghostInsidePort = new JavaPort<P>(isPositive, origin.getPortType(), proxy.getComponentCore());
+      ghostOutsidePort = Unsafe.createJavaPort(!isPositive, origin.getPortType(), proxy.getComponentCore());
+      JavaPort<P> ghostInsidePort = Unsafe.createJavaPort(isPositive, origin.getPortType(), proxy.getComponentCore());
 
       ghostOutsidePort.setPair(ghostInsidePort);
       ghostInsidePort.setPair(ghostOutsidePort);
@@ -94,7 +94,7 @@ class InboundHandler extends ProxyHandler {
       }
       originToGhostPort.put(origin, ghostOutsidePort);
     }
-    request.setOrigin(ghostOutsidePort);
+    Unsafe.setOrigin(request, ghostOutsidePort);
   }
 
   private class GhostHandler extends ProxyHandler {

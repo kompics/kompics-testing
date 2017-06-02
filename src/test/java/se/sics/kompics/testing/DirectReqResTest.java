@@ -25,6 +25,7 @@ import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Positive;
+import se.sics.kompics.Unsafe;
 
 import static org.junit.Assert.assertEquals;
 
@@ -88,13 +89,13 @@ public class DirectReqResTest extends TestHelper{
     outResInReqSetup();
     final DirectPing reqA = dPing(1), reqB = dPing(2);
     DirectPong resA = dPong(1), resB = dPong(2);
-    reqB.setOrigin(pingerPort);
+    Unsafe.setOrigin(reqB, pingerPort);
 
     // reset origin for ping used in loop otherwise, multiple ghost ports are created
     BlockInit resetOrigin = new BlockInit() {
       @Override
       public void init() {
-        reqA.setOrigin(pingerPort);
+        Unsafe.setOrigin(reqA, pingerPort);
       }
     };
 

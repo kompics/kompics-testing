@@ -28,6 +28,7 @@ import se.sics.kompics.PortType;
 import se.sics.kompics.Request;
 import se.sics.kompics.RequestPathElement;
 import se.sics.kompics.Response;
+import se.sics.kompics.Unsafe;
 
 import java.util.List;
 
@@ -55,7 +56,7 @@ class OutBoundHandler extends ProxyHandler {
     if (event instanceof Direct.Request) {
       Direct.Request request = (Direct.Request) event;
       //// TODO: 6/1/17 not public
-      request.setOrigin(portStruct.getInboundPort().getPair());
+      Unsafe.setOrigin(request, portStruct.getInboundPort().getPair());
     }
 
     EventSpec eventSpec = proxy.getFsm().newEventSpec(event, sourcePort, Direction.OUT);
