@@ -332,7 +332,16 @@ class CTRL<T extends ComponentDefinition> {
       checkWorkCount();
       return true;
     }
+    checkUncaughtException(receivedSpec);
     return false;
+  }
+
+  private void checkUncaughtException(EventSpec receivedSpec) {
+    if (receivedSpec != null
+        && receivedSpec.getEvent() instanceof Fault
+        && receivedSpec.getPort() == definitionUnderTest.getControlPort()) {
+        logger.error("Uncaught Exception [{}]", receivedSpec.getEvent());
+    }
   }
 
   private void checkWorkCount() {

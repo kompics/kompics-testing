@@ -20,14 +20,13 @@
  */
 package se.sics.kompics.testing;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
 class EventQueue {
 
   private long timeoutMS = 400;
-  private final BlockingQueue<EventSpec> q = new LinkedBlockingQueue<EventSpec>();
+  private final LinkedBlockingDeque<EventSpec> q = new LinkedBlockingDeque<EventSpec>();
 
   void setTimeout(long timeout) {
     if (timeout < 0) {
@@ -38,6 +37,10 @@ class EventQueue {
 
   void offer(EventSpec event) {
     q.offer(event);
+  }
+
+  void addFirst(EventSpec event) {
+    q.addFirst(event);
   }
 
   EventSpec poll() {

@@ -70,6 +70,7 @@ public class TestHelper {
       @Override
       public void handle(Pong event) {
         incrementPongsReceived();
+        checkThrowException(event);
       }
     };
 
@@ -83,6 +84,12 @@ public class TestHelper {
     private void incrementPongsReceived() {
       if (pongsReceived != null) {
         pongsReceived.count++;
+      }
+    }
+
+    private void checkThrowException(Pong pong) {
+      if (pong.id < 0) {
+        throw new IllegalStateException("Negative Pong");
       }
     }
 

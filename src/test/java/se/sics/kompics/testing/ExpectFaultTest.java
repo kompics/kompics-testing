@@ -38,7 +38,7 @@ import se.sics.kompics.Start;
 
 import static se.sics.kompics.testing.Direction.IN;
 
-public class ExpectFaultTest {
+public class ExpectFaultTest extends TestHelper{
 
   private TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
@@ -120,6 +120,32 @@ public class ExpectFaultTest {
     tc.end();
 
     assert tc.check();
+  }
+
+  @Test
+  public void catchFaultThrownBetweenEventsTest() {
+    TestContext<TestHelper.Pinger> tc = TestContext.newTestContext(TestHelper.Pinger.class);
+    Component pinger = tc.getComponentUnderTest(), ponger = tc.create(TestHelper.Ponger.class);
+    Negative<TestHelper.PingPongPort> pingerPort = pinger.getNegative(TestHelper.PingPongPort.class);
+    Positive<TestHelper.PingPongPort> pongerPort = ponger.getPositive(TestHelper.PingPongPort.class);
+    tc.connect(pingerPort, pongerPort);
+    tc
+        .allow(pong(0), pingerPort, IN)
+        .allow(pong(-1), pingerPort, IN)
+        .body()
+        .repeat(3).body()
+            .trigger(pong(0), pongerPort.getPair())
+        .end()
+
+        .trigger(pong(-1), pongerPort.getPair()) // check that error thrown here is caught before next pong in queue
+        .trigger(pong(1), pongerPort.getPair())
+
+        .expectFault(IllegalStateException.class)
+        .expect(pong(1), pingerPort, IN)
+    ;
+
+    assert tc.check();
+
   }
 
   private void matchNegativePong(boolean matchByClass) {
