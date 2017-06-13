@@ -14,6 +14,7 @@ public class KompicsExceptionTest extends TestHelper{
     Negative<PingPongPort> pingerPort = pinger.getNegative(PingPongPort.class);
     Positive<PingPongPort> pongerPort = ponger.getPositive(PingPongPort.class);
     tc.connect(pingerPort, pongerPort);
+    /*origin for ping0 is not set, causes null exception when in inbound handler*/
     tc.body()
         .trigger(dPing(0), pingerPort.getPair())
         .expect(dPing(0), pongerPort, IN)

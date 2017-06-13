@@ -20,6 +20,7 @@
  */
 package se.sics.kompics.testing;
 
+import se.sics.kompics.ComponentCore;
 import se.sics.kompics.Direct;
 import se.sics.kompics.JavaPort;
 import se.sics.kompics.KompicsEvent;
@@ -34,14 +35,18 @@ import java.util.Map;
 
 class InboundHandler extends ProxyHandler {
 
-  private Port<? extends PortType> destPort;
-  private PortType portType;
+  private final Port<? extends PortType> destPort;
+  private final PortType portType;
+  private final ComponentCore proxyCore;
+  // handle incoming Direct.Request
+  private final Map<Port, JavaPort> originToGhostPort = new HashMap<Port, JavaPort>();
 
   InboundHandler(
           Proxy proxy, PortStructure portStruct, Class<? extends KompicsEvent> eventType) {
     super(proxy, portStruct, eventType);
     this.destPort = portStruct.getOutboundPort();
     this.portType = destPort.getPortType();
+    this.proxyCore = proxy.getComponentCore();
   }
 
   @Override
@@ -67,24 +72,29 @@ class InboundHandler extends ProxyHandler {
     destPort.doTrigger(event, 0, proxy.getComponentCore());
   }
 
-  // handle incoming Direct.Request
-  private Map<Port, JavaPort> originToGhostPort = new HashMap<Port, JavaPort>();
-
+  // for incoming requests, responses are normally triggered on origin port.
+  // intercept requests and set custom port as origin to route response back to testing
   private <P extends PortType> void setupDirectRequest(Direct.Request request, Port<P> origin) {
+    // if previously ghost port for this origin (avoids creating new ports for each incoming request)
     JavaPort<P> ghostOutsidePort = originToGhostPort.get(origin);
+
     if (ghostOutsidePort == null) {
       assert portType == origin.getPortType();
-      boolean isPositive = portStruct.isProvidedPort;
-      ghostOutsidePort = Unsafe.createJavaPort(!isPositive, origin.getPortType(), proxy.getComponentCore());
-      JavaPort<P> ghostInsidePort = Unsafe.createJavaPort(isPositive, origin.getPortType(), proxy.getComponentCore());
+
+      boolean positivePort = portStruct.isProvidedPort;
+      assert positivePort; // incoming request implies provided port
+      P portType = origin.getPortType();
+
+      // response will be triggered directly on outside port
+      ghostOutsidePort = Unsafe.createJavaPort(!positivePort, portType, proxyCore);
+      // custom handler is subscribed on insider port
+      JavaPort<P> ghostInsidePort = Unsafe.createJavaPort(positivePort, portType, proxyCore);
 
       ghostOutsidePort.setPair(ghostInsidePort);
       ghostInsidePort.setPair(ghostOutsidePort);
 
-      // subscribe ghosthandler
-      Collection<Class<? extends KompicsEvent>> insidePortEvents = isPositive
-              ? Unsafe.getPositiveEvents(portType)
-              : Unsafe.getNegativeEvents(portType);
+      // subscribe a custom handler on custom inside port, for each possible response type
+      Collection<Class<? extends KompicsEvent>> insidePortEvents = Unsafe.getPositiveEvents(portType);
       for (Class<? extends KompicsEvent> eventType : insidePortEvents) {
         if (Direct.Response.class.isAssignableFrom(eventType)) {
           ghostInsidePort.doSubscribe(new GhostHandler((Class<? extends Direct.Response>) eventType, origin));
@@ -95,7 +105,9 @@ class InboundHandler extends ProxyHandler {
     Unsafe.setOrigin(request, ghostOutsidePort);
   }
 
+  // handler subscribed on inside custom port, intercepts responses and adds them to event queue
   private class GhostHandler extends ProxyHandler {
+    // request origin
     Port origin;
 
     GhostHandler(Class<? extends Direct.Response> eventType, Port origin) {
@@ -113,7 +125,7 @@ class InboundHandler extends ProxyHandler {
     @Override
     void doHandle(KompicsEvent response) {
       assert response instanceof Direct.Response;
-      origin.doTrigger(response, 0, proxy.getComponentCore());
+      origin.doTrigger(response, 0, proxyCore);
     }
   }
 
