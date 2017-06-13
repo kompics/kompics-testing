@@ -21,100 +21,95 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Predicate;
+import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
-import se.sics.kompics.*;
+import se.sics.kompics.Negative;
 
 import static se.sics.kompics.testing.Direction.*;
 
-public class InspectTest {
+public class InspectTest extends TestHelper{
 
-  private TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, Init.NONE);
-  private Component pinger = tc.getComponentUnderTest();
-  private Component ponger = tc.create(Ponger.class, Init.NONE);
-  private static Ping ping = new Ping();
-  private static Pong pong = new Pong();
+  private TestContext<Pinger> tc;
+  private Negative<PingPongPort> pingerPort;
+  private Counter counter;
+  private Pong pong = pong(0);
+
+  @Before
+  public void init() {
+    counter = new Counter();
+    tc = TestContext.newTestContext(Pinger.class, new PingerInit(counter));
+    Component pinger = tc.getComponentUnderTest();
+    pingerPort = pinger.getNegative(PingPongPort.class);
+  }
 
   @Test
-  public void work() {
-    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class));
-    tc.body().
-       repeat(10).body().
-        expect(ping, pinger.getNegative(PingPongPort.class), OUT).
-        inspect(expectedPings).
-        expect(pong, pinger.getNegative(PingPongPort.class), IN).
-        inspect(expectedPongs).
-       end();
+  public void singleTest() {
+    tc.body()
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            counter.count++;
+            return true;
+          }
+        })
+    ;
+    assert tc.check();
+    assert counter.count == 1;
+  }
+
+  @Test
+  public void withTriggerTest() {
+    tc.body()
+        .trigger(pong, pingerPort)
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            return pinger.pongsReceived.count == 1;
+          }
+        });
 
     assert tc.check();
   }
 
-  private Predicate<Pinger> expectedPings = new Predicate<Pinger>() {
-    int expectedPingsSent = 0;
-    @Override
-    public boolean apply(Pinger pinger) {
-      return pinger.pingsSent == ++expectedPingsSent;
-    }
-  };
+  @Test
+  public void repeatTest() {
+    final int N = 3;
+    final Counter timesRun = new Counter();
+    tc.body()
+        .repeat(N).body()
+            .trigger(pong, pingerPort)
+            .inspect(new Predicate<Pinger>() {
+              @Override
+              public boolean apply(Pinger pinger) {
+                timesRun.count++;
+                return true;
+              }
+            })
+        .end()
 
-  private Predicate<Pinger> expectedPongs = new Predicate<Pinger>() {
-    int expectedPongsReceived = 0;
-    @Override
-    public boolean apply(Pinger pinger) {
-      return pinger.pongsReceived == ++expectedPongsReceived;
-    }
-  };
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            return pinger.pongsReceived.count == N;
+          }
+        })
+    ;
 
-  public static class Pinger extends ComponentDefinition {
-    Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-    int pingsSent = 0;
-    int pongsReceived = 0;
-
-    Handler<Pong> pongHandler = new Handler<Pong>() {
-      @Override
-      public void handle(Pong pong) {
-        trigger(ping, ppPort);
-        pingsSent++;
-        pongsReceived++;
-      }
-    };
-
-    Handler<Start> startHandler = new Handler<Start>() {
-      @Override
-      public void handle(Start event) {
-        trigger(ping, ppPort);
-        pingsSent++;
-      }
-    };
-
-    {
-      subscribe(pongHandler, ppPort);
-      subscribe(startHandler, control);
-    }
+    assert tc.check();
+    assert timesRun.count == N;
   }
 
-  public static class Ponger extends ComponentDefinition {
-    Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
+  @Test
+  public void failTest() {
+    tc.body()
+        .inspect(new Predicate<Pinger>() {
+          @Override
+          public boolean apply(Pinger pinger) {
+            return false;
+          }
+        });
 
-    Handler<Ping> pingHandler = new Handler<Ping>() {
-      @Override
-      public void handle(Ping ping) {
-        trigger(pong, pingPongPort);
-      }
-    };
-
-    {
-      subscribe(pingHandler, pingPongPort);
-    }
+    assert !tc.check();
   }
-
-  public static class PingPongPort extends PortType {
-    {
-      request(Ping.class);
-      indication(Pong.class);
-    }
-  }
-
-  public static class Ping implements KompicsEvent{ }
-  public static class Pong implements KompicsEvent{ }
 }

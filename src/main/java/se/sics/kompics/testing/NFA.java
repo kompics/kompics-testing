@@ -28,6 +28,7 @@ import se.sics.kompics.KompicsEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -59,6 +60,7 @@ class NFA {
   private RepeatFA repeatMain;
   private Set<State> currentStates = new HashSet<State>();
   private final State errorState;
+  private final Collection<Transition> errorTransition;
   private Logger logger = TestContext.logger;
   private FA currentFA;
   private Stack<FA> previousFA = new Stack<FA>();
@@ -69,6 +71,7 @@ class NFA {
     currentFA = repeatMain;
     previousFA.push(repeatMain);
     errorState = new State(0, initialBlock);
+    errorTransition = Collections.singleton(new Transition(errorState));
   }
 
   private int nextid() {
@@ -167,7 +170,7 @@ class NFA {
     return false;
   }
 
-  private boolean inErrorState() {
+  boolean inErrorState() {
     return currentStates.size() == 1 && currentStates.contains(errorState);
   }
 
@@ -667,8 +670,8 @@ class NFA {
 
       // trigger, inspect, etc
       if (internalEventSpec != null) {
-        internalEventSpec.performInternalEvent();
-        return transitions.get(internalEventSpec);
+        String error = internalEventSpec.performInternalEvent();
+        return error != null? errorTransition : transitions.get(internalEventSpec);
       }
 
       if (isEndOfLoop()) {

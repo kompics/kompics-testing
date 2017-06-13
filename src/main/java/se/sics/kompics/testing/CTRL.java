@@ -327,6 +327,9 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   private boolean inFinalState(EventSpec receivedSpec) {
+    if (table.inErrorState()) {
+      return false;
+    }
     if (receivedSpec == null && table.isInFinalState()) {
       // wait until all events have been handled by cut
       checkWorkCount();
