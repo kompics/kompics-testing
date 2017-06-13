@@ -21,186 +21,80 @@
 package se.sics.kompics.testing;
 
 import org.junit.Test;
-import static junit.framework.Assert.assertEquals;
-import se.sics.kompics.*;
+import se.sics.kompics.Component;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Positive;
 
-import java.util.Comparator;
+import static org.junit.Assert.assertEquals;
 
-public class RequestResponseTest {
+public class RequestResponseTest extends TestHelper{
 
-  private static boolean replyAfterNPongs = false;
-  private static int numberOfRequiredPongs = 2;
+  private PingRequest ping = rping(1);
+  private PongResponse pong = rpong(1, ping);
+  private PingRequest ping2 = rping(2);
+  private PongResponse pong2 = rpong(2, ping2);
 
-  private TestContext tc;
-  private Component pinger;
-  private Component pinger2;
-  private Component ponger;
-  private Component ponger2;
+  Component pinger, pinger2, ponger;
 
-  private Direction incoming = Direction.IN;
-  private Direction outgoing = Direction.OUT;
+  private Negative<PingPongPort> pingerPort;
+  private Negative<PingPongPort> pinger2Port;
+  private Positive<PingPongPort> pongerPort;
+
+  private void init(TestContext tc){
+    pongerPort = ponger.getPositive(PingPongPort.class);
+    pingerPort = pinger.getNegative(PingPongPort.class);
+    pinger2Port = pinger2.getNegative(PingPongPort.class);
+
+    tc.connect(pingerPort, pongerPort);
+    tc.connect(pinger2Port, pongerPort);
+  }
 
   @Test
-  public void componentSendsRequest() {
-    replyAfterNPongs = true;
-    tc = TestContext.newTestContext(Pinger.class, Init.NONE);
+  public void outgoingRequestTest() {
+    TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
-    pinger2 = tc.create(Pinger.class, Init.NONE);
-    ponger = tc.create(Ponger.class, Init.NONE);
-    ponger2 = tc.create(Ponger.class, Init.NONE);
-    int count = 0;
+    pinger2 = tc.create(Pinger.class, new PingerInit(new Counter()));
+    ponger = tc.create(Ponger.class);
 
-    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      connect(pinger.getNegative(PingPongPort.class), ponger2.getPositive(PingPongPort.class)).
-      connect(pinger2.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).
-      connect(pinger2.getNegative(PingPongPort.class), ponger2.getPositive(PingPongPort.class));
+    init(tc);
 
-    tc.
-        setComparator(Ping.class, new PingComparator()).
-      body().
-      repeat(10).body().
-        expect(new Ping(count), pinger.getNegative(PingPongPort.class), outgoing).
-        expect(new Pong(new Ping(count)), pinger.getNegative(PingPongPort.class), incoming).
-        expect(new Pong(new Ping(count)), pinger.getNegative(PingPongPort.class), incoming).
-      end();
+    int N = 5;
 
+    tc.body().repeat(N).body()
+        .trigger(ping, pingerPort.getPair()) // response is delivered only to pinger
+        .trigger(ping2, pinger2Port.getPair()) // response is delivered only to pinger2
+        .expect(ping, pingerPort, OUT)
+        .expect(pong, pingerPort, IN)
+    .end()
+    ;
     assert tc.check();
+    assertEquals(N, ((Pinger) pinger.getComponent()).pongsReceived.count);
+    assertEquals(N, ((Pinger) pinger2.getComponent()).pongsReceived.count);
   }
 
   @Test
-  public void componentSendsResponse() {
-    replyAfterNPongs = false;
-
-    tc = TestContext.newTestContext(Ponger.class, Init.NONE);
+  public void outgoingResponseTest() {
+    TestContext<Ponger> tc = TestContext.newTestContext(Ponger.class);
     ponger = tc.getComponentUnderTest();
-    ponger2 = tc.create(Ponger.class, Init.NONE);
-    pinger = tc.create(Pinger.class, Init.NONE);
-    pinger2 = tc.create(Pinger.class, Init.NONE);
+    pinger = tc.create(Pinger.class, new PingerInit(new Counter()));
+    pinger2 = tc.create(Pinger.class, new PingerInit(new Counter()));
 
-    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class));
-    tc.connect(pinger2.getNegative(PingPongPort.class), ponger2.getPositive(PingPongPort.class));
+    init(tc);
 
-    tc.setComparator(Ping.class, new PingComparator()).body();
+    int N = 5;
 
-    //// TODO: 2/21/17 write testcase for 1-to-1 channel forwarding on outbound - response
-    tc.
-      repeat(5).
-      body().
-        expect(new Ping(0), ponger.getPositive(PingPongPort.class), incoming).
-        expect(new Pong(new Ping(0)), ponger.getPositive(PingPongPort.class), outgoing).
-      end();
+    tc.body().repeat(N).body()
+        .trigger(ping, pingerPort.getPair())
+        .trigger(ping2, pinger2Port.getPair())
+        .expect(ping, pongerPort, IN)
+        .expect(ping2, pongerPort, IN)
+        .expect(pong, pongerPort, OUT)
+        .expect(pong2, pongerPort, OUT)
+    .end()
+    ;
 
     assert tc.check();
-  }
-
-  public static class Pinger extends ComponentDefinition {
-    public Pinger() {}
-    private int count = 0;
-    private int replies = 0;
-    Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-    Handler<Pong> pongHandler = new Handler<Pong>() {
-      @Override
-      public void handle(Pong event) {
-        if (RequestResponseTest.replyAfterNPongs) {
-          replies++;
-          if (replies == RequestResponseTest.numberOfRequiredPongs) {
-            replies = 0;
-            trigger(new Ping(0), ppPort);
-          }
-        } else {
-          trigger(new Ping(0), ppPort);
-        }
-      }
-    };
-
-    Handler<Start> startHandler = new Handler<Start>() {
-      @Override
-      public void handle(Start event) {
-        trigger(new Ping(count++), ppPort);
-        Kompics.logger.warn("Pinger {} started", this);
-      }
-    };
-
-    {
-      subscribe(pongHandler, ppPort);
-      subscribe(startHandler, control);
-    }
-  }
-
-  public static class Ponger extends ComponentDefinition {
-    Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
-
-    Handler<Ping> pingHandler = new Handler<Ping>() {
-      @Override
-      public void handle(Ping ping) {
-        //Kompics.logger.warn("Ponger {}: received {}", this, ping);
-        Pong pong = new Pong(RequestResponseTest.cloneRequest(ping));
-        trigger(pong, pingPongPort);
-      }
-    };
-
-    Handler<Start> startHandler = new Handler<Start>() {
-      @Override
-      public void handle(Start event) { }
-    };
-
-    {
-      subscribe(pingHandler, pingPongPort);
-      subscribe(startHandler, control);
-    }
-  }
-
-  public static class PingPongPort extends PortType {
-    {
-      request(Ping.class);
-      indication(Pong.class);
-    }
-  }
-
-  static class Ping extends Request {
-    int count;
-    Ping(int count) {
-      this.count = count;
-    }
-
-    public String toString() {
-      return "Ping(" + count + ")";
-    }
-  }
-
-  static class Pong extends Response {
-    private Ping ping;
-    Pong(Request ping) {
-      super(ping);
-      this.ping = (Ping) ping;
-    }
-    public boolean equals(Object o) {
-      return o instanceof Pong && ping.count == ((Pong) o).ping.count;
-    }
-
-    public int hashCode() {
-      return this.getClass().hashCode();
-    }
-
-    public String toString() {
-      return "Pong(" + ping.count + ")";
-    }
-  }
-
-  private class PingComparator implements Comparator<Ping> {
-    @Override
-    public int compare(Ping p1, Ping p2) {
-      return p1.count - p2.count;
-    }
-  }
-
-  public static Request cloneRequest(Request request) {
-    Request requestClone = null;
-    try {
-      requestClone = (Request) request.clone();
-    } catch (CloneNotSupportedException e) {
-      e.printStackTrace();
-    }
-    return requestClone;
+    assertEquals(N, ((Pinger) pinger2.getComponent()).pongsReceived.count);
+    assertEquals(N, ((Pinger) pinger.getComponent()).pongsReceived.count);
   }
 }

@@ -33,7 +33,7 @@ import se.sics.kompics.Response;
 
 import java.util.Comparator;
 
-public class TestHelper {
+class TestHelper {
 
   final Direction IN = Direction.IN;
   final Direction OUT = Direction.OUT;
@@ -55,6 +55,14 @@ public class TestHelper {
     return new DirectPong(id);
   }
 
+  PingRequest rping(int id) {
+    return new PingRequest(id);
+  }
+
+  PongResponse rpong(int id, PingRequest ping) {
+    return new PongResponse(id, ping);
+  }
+
   public static class Pinger extends ComponentDefinition {
     Counter pongsReceived;
 
@@ -71,6 +79,13 @@ public class TestHelper {
       public void handle(Pong event) {
         incrementPongsReceived();
         checkThrowException(event);
+      }
+    };
+
+    Handler<PongResponse> pongResponseHandler = new Handler<PongResponse>() {
+      @Override
+      public void handle(PongResponse event) {
+        incrementPongsReceived();
       }
     };
 
@@ -95,6 +110,7 @@ public class TestHelper {
 
     {
       subscribe(pongHandler, pingPongPort);
+      subscribe(pongResponseHandler, pingPongPort);
       subscribe(directPongHandler, pingPongPort);
     }
   }
@@ -125,6 +141,13 @@ public class TestHelper {
       }
     };
 
+    Handler<PingRequest> pingRequestHandler = new Handler<PingRequest>() {
+      @Override
+      public void handle(PingRequest ping) {
+        trigger(new PongResponse(ping.id, ping), pingPongPort);
+      }
+    };
+
     private void incrementPingsReceived() {
       if (pingsReceived != null) {
         pingsReceived.count++;
@@ -133,6 +156,7 @@ public class TestHelper {
 
     {
       subscribe(pingHandler, pingPongPort);
+      subscribe(pingRequestHandler, pingPongPort);
       subscribe(directPingHandler, pingPongPort);
     }
   }
@@ -201,6 +225,16 @@ public class TestHelper {
     PingRequest(int id) {
       this.id = id;
     }
+
+    @Override
+    public String toString() {
+      return "Ping<" + id + ">";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof PingRequest && id == ((PingRequest) o).id;
+    }
   }
 
   static class PongResponse extends Response {
@@ -208,6 +242,16 @@ public class TestHelper {
     protected PongResponse(int id, PingRequest ping) {
       super(ping);
       this.id = id;
+    }
+
+    @Override
+    public String toString() {
+      return "Pong<" + id + ">";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof PongResponse && id == ((PongResponse) o).id;
     }
   }
 
