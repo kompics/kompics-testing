@@ -5,13 +5,15 @@
 
 <groupId>kompics-testing</groupId>
 <artifactId>kompics-testing</artifactId>
-<version>1.0-SNAPSHOT</version>
+<version>0.1.0-SNAPSHOT</version>
 
 <properties>
     <java.compiler.version>1.7</java.compiler.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kompics.version>0.9.1-SNAPSHOT</kompics.version>
 </properties>
+
+
 <dependencies>
     <dependency>
         <groupId>se.sics.kompics.basic</groupId>
@@ -20,22 +22,9 @@
         <scope>compile</scope>
     </dependency>
     <dependency>
-        <groupId>se.sics.kompics.basic</groupId>
-        <artifactId>kompics-component-java-timer</artifactId>
-        <version>${kompics.version}</version>
-        <scope>compile</scope>
-    </dependency>
-    <dependency>
-        <groupId>se.sics.kompics.basic</groupId>
-        <artifactId>kompics-port-network</artifactId>
-        <version>${kompics.version}</version>
-        <scope>compile</scope>
-    </dependency>
-    <dependency>
-        <groupId>se.sics.kompics.basic</groupId>
-        <artifactId>kompics-component-netty-network</artifactId>
-        <version>${kompics.version}</version>
-        <scope>compile</scope>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>18.0</version>
     </dependency>
     <dependency>
         <groupId>org.slf4j</groupId>
@@ -44,6 +33,8 @@
         <scope>compile</scope>
     </dependency>
 </dependencies>
+
+
 <build>
     <plugins>
         <plugin>

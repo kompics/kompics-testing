@@ -39,9 +39,7 @@ import se.sics.kompics.testing.pingpong.PongComparator;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timeout;
 import se.sics.kompics.timer.Timer;
-import se.sics.kompics.timer.java.JavaTimer;
 
-import static org.junit.Assert.assertEquals;
 import static se.sics.kompics.testing.Direction.*;
 
 import java.util.Random;
@@ -76,12 +74,12 @@ public class UnorderedEventsTest {
   }
 
   private void connectTimers() {
-    Component timer1 = tc.create(JavaTimer.class, Init.NONE);
-    Component timer3 = tc.create(JavaTimer.class, Init.NONE);
-    Component timer2 = tc.create(JavaTimer.class, Init.NONE);
-    tc.connect(ponger1.getNegative(Timer.class), timer1.getPositive(Timer.class));
-    tc.connect(ponger2.getNegative(Timer.class), timer2.getPositive(Timer.class));
-    tc.connect(ponger3.getNegative(Timer.class), timer3.getPositive(Timer.class));
+    //Component timer1 = tc.create(JavaTimer.class, Init.NONE);
+    //Component timer3 = tc.create(JavaTimer.class, Init.NONE);
+    //Component timer2 = tc.create(JavaTimer.class, Init.NONE);
+    //tc.connect(ponger1.getNegative(Timer.class), timer1.getPositive(Timer.class));
+    //tc.connect(ponger2.getNegative(Timer.class), timer2.getPositive(Timer.class));
+    //tc.connect(ponger3.getNegative(Timer.class), timer3.getPositive(Timer.class));
   }
 
   @Test
