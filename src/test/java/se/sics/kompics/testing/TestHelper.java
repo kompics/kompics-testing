@@ -20,6 +20,7 @@
  */
 package se.sics.kompics.testing;
 
+import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Direct;
 import se.sics.kompics.Handler;
@@ -37,7 +38,6 @@ class TestHelper {
 
   final Direction IN = Direction.IN;
   final Direction OUT = Direction.OUT;
-
 
   Ping ping(int id) {
     return new Ping(id);
@@ -61,6 +61,14 @@ class TestHelper {
 
   PongResponse rpong(int id, PingRequest ping) {
     return new PongResponse(id, ping);
+  }
+
+  int pongsReceived(Component c) {
+    return ((Pinger) c.getComponent()).pongsReceived.count;
+  }
+
+  int pingsReceived(Component c) {
+    return ((Ponger) c.getComponent()).pingsReceived.count;
   }
 
   public static class Pinger extends ComponentDefinition {

@@ -20,229 +20,134 @@
  */
 package se.sics.kompics.testing;
 
-import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
-import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Handler;
-import se.sics.kompics.Init;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Positive;
-import se.sics.kompics.testing.pingpong.Ping;
-import se.sics.kompics.testing.pingpong.PingComparator;
-import se.sics.kompics.testing.pingpong.PingPongPort;
-import se.sics.kompics.testing.pingpong.Pinger;
-import se.sics.kompics.testing.pingpong.Pong;
-import se.sics.kompics.testing.pingpong.PongComparator;
-import se.sics.kompics.timer.ScheduleTimeout;
-import se.sics.kompics.timer.Timeout;
-import se.sics.kompics.timer.Timer;
 
-import static se.sics.kompics.testing.Direction.*;
+import static org.junit.Assert.assertEquals;
 
-import java.util.Random;
 
-public class UnorderedEventsTest {
+public class UnorderedTest extends TestHelper{
 
   private TestContext<Pinger> tc;
+  private Component pinger, ponger;
   private Negative<PingPongPort> pingerPort;
-
-  private Component pinger, ponger1, ponger2, ponger3;
-
-  private Ping ping = new Ping(0);
-  private Pong pong1 = new Pong(1);
-  private Pong pong2 = new Pong(2);
-  private Pong pong3 = new Pong(3);
+  private Positive<PingPongPort> pongerPort;
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(Pinger.class, Init.NONE);
+    tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
-    ponger1 = tc.create(Ponger.class, new PongerInit(1));
-    ponger2 = tc.create(Ponger.class, new PongerInit(2));
-    ponger3 = tc.create(Ponger.class, new PongerInit(3));
-
+    ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);
-    tc.connect(pingerPort, ponger1.getPositive(PingPongPort.class));
-    tc.connect(pingerPort, ponger2.getPositive(PingPongPort.class));
-    tc.connect(pingerPort, ponger3.getPositive(PingPongPort.class));
-
-    tc.setComparator(Ping.class, new PingComparator()).
-        setComparator(Pong.class, new PongComparator());
-  }
-
-  private void connectTimers() {
-    //Component timer1 = tc.create(JavaTimer.class, Init.NONE);
-    //Component timer3 = tc.create(JavaTimer.class, Init.NONE);
-    //Component timer2 = tc.create(JavaTimer.class, Init.NONE);
-    //tc.connect(ponger1.getNegative(Timer.class), timer1.getPositive(Timer.class));
-    //tc.connect(ponger2.getNegative(Timer.class), timer2.getPositive(Timer.class));
-    //tc.connect(ponger3.getNegative(Timer.class), timer3.getPositive(Timer.class));
+    pongerPort = ponger.getPositive(PingPongPort.class);
+    tc.connect(pingerPort, pongerPort);
   }
 
   @Test
-  public void unorderedTest() {
-    connectTimers();
-
-    tc.setDefaultAction(Ping.class, new Function<Ping, Action>() {
-         @Override
-         public Action apply(Ping ping) {
-           return ping.count == 0? Action.HANDLE : Action.DROP;
-         }
-    }).body();
-
-    tc.repeat(10).body().
-       trigger(ping, pingerPort.getPair()).
-       expect(ping, pingerPort, OUT).
-       unordered().
-            expect(pong1, pingerPort, IN).
-            expect(pong2, pingerPort, IN).
-            expect(pong3, pingerPort, IN).
-       end().
-    end();
-
+  public void singleEventOut() {
+    int N = 3;
+    tc.body().repeat(N).body()
+        .trigger(ping(0), pingerPort.getPair())
+        .unordered()
+            .expect(ping(0), pingerPort, OUT)
+        .end()
+    .end()
+    ;
     assert tc.check();
-  }
-
-  private ScheduleTimeout st = new ScheduleTimeout(500);
-  private RandomTimeout timeout = new RandomTimeout(st);
-
-  @Test
-  public void expectWithinSingleBlockTest() {
-    initExpectWithinBlock();
-
-    tc.
-        blockExpect(Pong.class, predicateForPong(1), pingerPort, IN).
-        blockExpect(pong2, pingerPort, IN).
-       body().
-         trigger(ping, pingerPort.getPair()).
-         expect(ping, pingerPort, OUT).
-         trigger(timeout, ponger1.getNegative(Timer.class)).
-         trigger(timeout, ponger3.getNegative(Timer.class)).
-         trigger(timeout, ponger2.getNegative(Timer.class)).
-         expect(pong3, pingerPort, IN);
-
-    assert tc.check();
-  }
-
-  private Predicate<Pong> predicateForPong(final int count) {
-    return new Predicate<Pong>() {
-      @Override
-      public boolean apply(Pong pong) {
-        return pong.count == count;
-      }
-
-      @Override
-      public String toString() {
-        return "Predicate(Pong(" + count + "))";
-      }
-    };
-  }
-
-  private void initExpectWithinBlock() {
-    tc.setDefaultAction(Ping.class, new Function<Ping, Action>() {
-      @Override
-      public Action apply(Ping ping) {
-        return Action.DROP;
-      }
-    }); // drop pings that weren't triggered
+    assertEquals(N, pingsReceived(ponger));
   }
 
   @Test
-  public void expectWithinEmptyBlockTest() {
-    connectTimers();
-    initExpectWithinBlock();
-    tc.body().
-        repeat(10).
-        body().
-          trigger(ping, pingerPort.getPair()).
-          expect(ping, pingerPort, OUT).
-          repeat(1).
-            blockExpect(Pong.class, predicateForPong(1), pingerPort, IN).
-            blockExpect(Pong.class, predicateForPong(2), pingerPort, IN).
-            blockExpect(pong3, pingerPort, IN).
-          body().
-          end().
-        end();
-    //assertEquals(tc.check(), tc.getFinalState());
+  public void singleEventIn() {
+    int N = 3;
+    tc.body().repeat(N).body()
+        .trigger(pong(0), pongerPort.getPair())
+        .unordered()
+            .expect(pong(0), pingerPort, IN)
+        .end()
+    .end()
+    ;
     assert tc.check();
+    assertEquals(N, pongsReceived(pinger));
   }
 
   @Test
-  public void ExpectWithinMultipleBlockTest() {
-    tc.setTimeout(Ponger.timeout * 2);
-    connectTimers();
-    initExpectWithinBlock();
-    tc.body().
-       repeat(10).
-            blockExpect(pong1, pingerPort, IN).
-       body().
-          trigger(ping, pingerPort.getPair()).
-          repeat(1).
-            blockExpect(pong2, pingerPort, IN).
-          body().
-             expect(ping, pingerPort, OUT).
-             repeat(1).
-                blockExpect(pong3, pingerPort, IN).
-             body().
-             end().
-          end().
-       end();
+  public void multipleEvents() {
+    int N = 3;
+    tc.body().repeat(N).body()
+        .trigger(ping(4), pingerPort.getPair())
+        .trigger(pong(3), pongerPort.getPair())
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+
+        .unordered()
+            .expect(pong(1), pingerPort, IN)
+            .expect(ping(2), pingerPort, OUT)
+            .expect(pong(3), pingerPort, IN)
+            .expect(ping(4), pingerPort, OUT)
+        .end()
+    .end()
+    ;
+
     assert tc.check();
+    assertEquals(2*N, pongsReceived(pinger));
+    assertEquals(2*N, pingsReceived(ponger));
   }
 
-  public static class Ponger extends ComponentDefinition {
+  @Test
+  public void matchingFunction() {
+    int N = 3;
+    tc.body().repeat(N).body()
+        .trigger(pong(2), pongerPort.getPair())
+        .trigger(ping(1), pingerPort.getPair())
 
-    private static long timeout = 10;
-    private Random random = new Random(System.nanoTime());
-    private Positive<Timer> timer = requires(Timer.class);
-    private Negative<PingPongPort> ppPort = provides(PingPongPort.class);
-    private int id;
+        .unordered()
+            .expect(Ping.class, new Predicate<Ping>() {
+              @Override
+              public boolean apply(Ping ping) {
+                return ping.id == 1;
+              }
+            }, pingerPort, OUT)
 
-    public Ponger(PongerInit init) {
-      id = init.id;
-    }
+            .expect(Pong.class, new Predicate<Pong>() {
+              @Override
+              public boolean apply(Pong pong) {
+                return pong.id == 2;
+              }
+            }, pingerPort, IN)
+        .end()
+    .end()
+    ;
 
-    private Handler<Ping> pingHandler = new Handler<Ping>() {
-      @Override
-      public void handle(Ping ping) {
-        setTimer();
-      }
-    };
-
-    private Handler<RandomTimeout> timeoutHandler = new Handler<RandomTimeout>() {
-      @Override
-      public void handle(RandomTimeout timeout) {
-        trigger(new Pong(id), ppPort);
-      }
-    };
-
-    private void setTimer() {
-      long delay = random.nextInt((int) timeout);
-      ScheduleTimeout st = new ScheduleTimeout(delay);
-      RandomTimeout timeout = new RandomTimeout(st);
-      st.setTimeoutEvent(timeout);
-      trigger(st, timer);
-    }
-
-    {
-      subscribe(timeoutHandler, timer);
-      subscribe(pingHandler, ppPort);
-    }
+    assert tc.check();
+    assertEquals(N, pongsReceived(pinger));
+    assertEquals(N, pingsReceived(ponger));
   }
 
-  public static class PongerInit extends Init<Ponger> {
-    int id;
-    public PongerInit(int id) {
-      this.id = id;
-    }
-  }
+  @Test
+  public void intermediateEvents() {
+    int N = 3;
+    tc.body().repeat(N).body()
+        .trigger(ping(1), pingerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(ping(2), pingerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
 
-  private static class RandomTimeout extends Timeout {
-    RandomTimeout(ScheduleTimeout st) {
-      super(st);
-    }
+        .expect(ping(1), pingerPort, OUT)
+        .unordered()
+            .expect(ping(2), pingerPort, OUT)
+            .expect(pong(1), pingerPort, IN)
+        .end()
+        .expect(pong(2), pingerPort, IN)
+    .end()
+    ;
+
+    assert tc.check();
+    assertEquals(2*N, pongsReceived(pinger));
+    assertEquals(2*N, pingsReceived(ponger));
   }
 }
