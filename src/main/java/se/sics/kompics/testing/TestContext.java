@@ -386,7 +386,7 @@ public class TestContext<T extends ComponentDefinition> {
     }
 
     if (direction == Direction.IN && !proxy.isConnectedPort(port)) {
-      throw new IllegalStateException("Cannot watch incoming message on an unconnected port " + port);
+      throw new IllegalStateException(String.format("Cannot watch incoming message on an unconnected port %s. Check that this port has been connected" , port));
     }
   }
   

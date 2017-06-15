@@ -21,119 +21,99 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Predicate;
+import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
 
 import se.sics.kompics.Component;
-import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Fault;
-import se.sics.kompics.Handler;
-import se.sics.kompics.Init;
-import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Negative;
-import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
-import se.sics.kompics.Request;
-import se.sics.kompics.Start;
-
-import static se.sics.kompics.testing.Direction.IN;
 
 public class ExpectFaultTest extends TestHelper{
+  private TestContext<TestHelper.Pinger> tc;
+  private Component pinger, ponger;
+  private Negative<TestHelper.PingPongPort> pingerPort;
+  private Positive<TestHelper.PingPongPort> pongerPort;
 
-  private TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, Init.NONE);
-  private Component pinger = tc.getComponentUnderTest();
-  private Component ponger = tc.create(Ponger.class, Init.NONE);
-
-  private Predicate<Throwable> negativePingPredicate = new Predicate<Throwable>() {
-    @Override
-    public boolean apply(Throwable throwable) {
-      return throwable.getMessage().equals(NEGATIVE_PONG);
-    }
-  };
-
-  private static int N = 5;
-  private static String NEGATIVE_PONG = "negative ping";
-  private static String MULTIPLE_OF_N = "multiple of " + N;
-  private Ping ping = new Ping(0);
-  private Pong pong = new Pong(0);
-
-  private BlockInit incrementCounters = new BlockInit() {
-    @Override
-    public void init() {
-      ping.count++;
-      pong.count++;
-    }
-  };
-
-  @Test
-  public void faultPairedWithTriggerTest() {
-    throwErrorOnNegativeFault(true);
+  @Before
+  public void init() {
+    tc = TestContext.newTestContext(TestHelper.Pinger.class, new PingerInit(new Counter()));
+    pinger = tc.getComponentUnderTest();
+    ponger = tc.create(TestHelper.Ponger.class, new PongerInit(new Counter()));
+    pingerPort = pinger.getNegative(TestHelper.PingPongPort.class);
+    pongerPort = ponger.getPositive(TestHelper.PingPongPort.class);
+    tc.connect(pingerPort, pongerPort);
   }
 
   @Test
-  public void faultPairedWithExpectTest() {
-    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).body()
-        .repeat(10)
-        .body()
-            .repeat(N - 1, incrementCounters) // pinger receive n - 1 pongs
-            .body()
-                .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
-                .expect(pong, pinger.getNegative(PingPongPort.class), IN)
-            .end()
-
-            // on Nth pong, throws exception
-            .repeat(1, incrementCounters)
-            .body()
-                .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
-                .expect(pong, pinger.getNegative(PingPongPort.class), IN)
-                .expectFault(IllegalStateException.class)
-            .end()
+  public void matchByClass() {
+    int N = 3;
+    tc.body()
+        .repeat(N).body()
+            .trigger(pong(0), pongerPort.getPair())
+            .expect(pong(0), pingerPort, IN)
+            .trigger(pong(-1), pongerPort.getPair())
+            .expect(pong(-1), pingerPort, IN) // throws error
+            .expectFault(IllegalStateException.class)
         .end()
     ;
     assert tc.check();
+    assertEquals(N*2, pongsReceived(pinger));
   }
 
   @Test
-  public void expectFaultWithPredicateTest() {
-    throwErrorOnNegativeFault(false);
-  }
-
-
-  private void throwErrorOnNegativeFault(boolean matchByClass) {
-    Pong negativePong = new Pong(-1);
-
-    tc.connect(pinger.getNegative(PingPongPort.class), ponger.getPositive(PingPongPort.class)).body()
-        .repeat(1, incrementCounters)
-        .body()
-            .trigger(pong, ponger.getPositive(PingPongPort.class).getPair())
-            .expect(pong, pinger.getNegative(PingPongPort.class), IN)
-
-            // trigger from ponger's port
-            .trigger(negativePong, ponger.getPositive(PingPongPort.class).getPair())
-            .expect(negativePong, pinger.getNegative(PingPongPort.class), IN);
-
-    matchNegativePong(matchByClass);
-
-          // trigger directly on pinger's port
-            tc.trigger(negativePong, pinger.getNegative(PingPongPort.class));
-            matchNegativePong(matchByClass);
-    tc.end();
-
+  public void matchByEvent() {
+    int N = 3;
+    tc.body()
+        .repeat(N).body()
+            .trigger(pong(0), pongerPort.getPair())
+            .expect(pong(0), pingerPort, IN)
+            .trigger(pong(-1), pongerPort.getPair())
+            .expect(pong(-1), pingerPort, IN) // throws error
+            .expectFault(new Predicate<Throwable>() {
+              @Override
+              public boolean apply(Throwable throwable) {
+                return throwable instanceof IllegalStateException;
+              }
+            })
+        .end()
+    ;
     assert tc.check();
+    assertEquals(N*2, pongsReceived(pinger));
   }
 
   @Test
-  public void catchFaultThrownBetweenEventsTest() {
-    TestContext<TestHelper.Pinger> tc = TestContext.newTestContext(TestHelper.Pinger.class);
-    Component pinger = tc.getComponentUnderTest(), ponger = tc.create(TestHelper.Ponger.class);
-    Negative<TestHelper.PingPongPort> pingerPort = pinger.getNegative(TestHelper.PingPongPort.class);
-    Positive<TestHelper.PingPongPort> pongerPort = ponger.getPositive(TestHelper.PingPongPort.class);
-    tc.connect(pingerPort, pongerPort);
+  public void failIfNoFaultThrown() {
+    tc.body()
+        .trigger(ping(0), pingerPort.getPair())
+        .expect(ping(0), pingerPort, OUT)
+        .expectFault(IllegalStateException.class) // no exception is actually thrown
+    ;
+    assert !tc.check();
+    assertEquals(1, pingsReceived(ponger));
+  }
+
+  @Test
+  public void failIfUnexpectedFault() {
+    tc.body()
+        .trigger(pong(-1), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+
+        .expect(pong(-1), pingerPort, IN) // this causes exception
+        .expect(pong(1), pingerPort, IN) // this should not be delivered
+    ;
+    assert !tc.check();
+    assertEquals(1, pongsReceived(pinger));
+  }
+
+  @Test
+  public void catchFaultThrownBetweenEvents() {
+    int N = 3;
     tc
         .allow(pong(0), pingerPort, IN)
         .allow(pong(-1), pingerPort, IN)
         .body()
-        .repeat(3).body()
+        .repeat(N).body()
             .trigger(pong(0), pongerPort.getPair())
         .end()
 
@@ -143,103 +123,7 @@ public class ExpectFaultTest extends TestHelper{
         .expectFault(IllegalStateException.class)
         .expect(pong(1), pingerPort, IN)
     ;
-
     assert tc.check();
-
-  }
-
-  private void matchNegativePong(boolean matchByClass) {
-    if (matchByClass) {
-      tc.expectFault(IllegalStateException.class);
-    } else {
-      tc.expectFault(negativePingPredicate);
-    }
-  }
-
-  public static class Pinger extends ComponentDefinition {
-
-    Positive<PingPongPort> ppPort = requires(PingPongPort.class);
-
-    Handler<Pong> pongHandler = new Handler<Pong>() {
-      @Override
-      public void handle(Pong pong) {
-        if (pong.count < 0) {
-          throw new IllegalStateException(NEGATIVE_PONG);
-        }
-
-        if (pong.count != 0 && (pong.count) % N == 0) {
-          throw new IllegalStateException(MULTIPLE_OF_N);
-        }
-      }
-    };
-
-    Handler<Start> startHandler = new Handler<Start>() {
-      @Override
-      public void handle(Start event) { }
-    };
-
-    {
-      subscribe(pongHandler, ppPort);
-      subscribe(startHandler, control);
-    }
-  }
-
-  public static class Ponger extends ComponentDefinition {
-
-    Negative<PingPongPort> pingPongPort = provides(PingPongPort.class);
-
-    Handler<Ping> pingHandler = new Handler<Ping>() {
-      @Override
-      public void handle(Ping ping) {
-        Pong pong = new Pong(ping.count);
-        trigger(pong, pingPongPort);
-      }
-    };
-
-    {
-      subscribe(pingHandler, pingPongPort);
-    }
-  }
-
-  public static class PingPongPort extends PortType {
-    {
-      request(Ping.class);
-      indication(Pong.class);
-    }
-  }
-
-  static class Ping extends Request {
-    int count;
-    Ping(int count) { this.count = count; }
-
-    public boolean equals(Object o) {
-      return o instanceof Ping && ((Ping) o).count == count;
-    }
-
-    public int hashCode() {
-      return count;
-    }
-
-    public String toString() {
-      return "" + count;
-    }
-  }
-
-  static class Pong implements KompicsEvent {
-
-    int count;
-    Pong(int count) { this.count = count; }
-
-    public boolean equals(Object o) {
-      return o instanceof Pong && ((Pong)o).count == count;
-    }
-
-    public int hashCode() {
-      return count;
-    }
-
-    public String toString() {
-      return "" + count;
-    }
+    assertEquals(N + 2, pongsReceived(pinger));
   }
 }

@@ -252,7 +252,6 @@ class CTRL<T extends ComponentDefinition> {
     }
   }
 
-  // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Class<? extends Throwable> exceptionType) {
     assertBodyorConditionalMode();
@@ -260,7 +259,6 @@ class CTRL<T extends ComponentDefinition> {
     table.addSpec(spec);
   }
 
-  // // TODO: 4/22/17 remove resolveAction if not needed later on
   void expectFault(
       Predicate<Throwable> exceptionPredicate) {
     assertBodyorConditionalMode();

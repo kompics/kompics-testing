@@ -184,7 +184,7 @@ class NFA {
         tryStateTransitions(receivedSpec, nextStates);
       }
 
-      if (!nextStates.isEmpty()) {
+      if (!nextStates.isEmpty()) { // some transition matched received event
         return !inErrorState();
       } else {
         // check if any current state is an internal action
@@ -202,21 +202,22 @@ class NFA {
         }
 
         logger.debug("No internal transition(s) found");
-        logger.debug("trying e-transitions");
+      }
+
+      if (receivedSpec == null) {
+        logger.debug("No event was received");
+        return false;
       }
 
       // try registered default actions
+      logger.debug("trying default actions");
       boolean handleByDefault = tryDefaultActions(receivedSpec);
       if (handleByDefault) {
         return !inErrorState();
       }
 
-      if (receivedSpec == null) {
-        logger.debug("No event was received");
-      } else {
-        logger.error("No transitions found for {}", receivedSpec);
-        logger.debug("Last state was {}", currentStates);
-      }
+      logger.error("No transitions found for {}", receivedSpec);
+      logger.debug("Last state was {}", currentStates);
       return false;
     }
   }
@@ -233,7 +234,6 @@ class NFA {
     }
 
     if (!nextStates.isEmpty()) {
-      //logger.debug("{} some transitions were found from current state", currentStates);
       // kill threads without transitions and set new current states to next states
       updateCurrentState(nextStates);
 
@@ -254,10 +254,10 @@ class NFA {
       return false;
     }
 
-    //logger.debug("default action {}", action));
+    //logger.debug("default action {}", action);
     switch (action) {
       case FAIL:
-        logger.debug("Received unwanted event {} at state {}", receivedSpec, currentStates);
+        logger.debug("{}: Received unwanted event {}", currentStates, receivedSpec);
         return false;
       case HANDLE:
         receivedSpec.handle();

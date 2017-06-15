@@ -1,14 +1,3 @@
-package se.sics.kompics.testing;
-
-import com.google.common.base.Predicate;
-import org.junit.Before;
-import org.junit.Test;
-import se.sics.kompics.Component;
-import se.sics.kompics.Negative;
-import se.sics.kompics.Positive;
-
-import static org.junit.Assert.assertEquals;
-
 /**
  * This file is part of the Kompics Testing runtime.
  *
@@ -29,6 +18,16 @@ import static org.junit.Assert.assertEquals;
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+package se.sics.kompics.testing;
+
+import com.google.common.base.Predicate;
+import org.junit.Before;
+import org.junit.Test;
+import se.sics.kompics.Component;
+import se.sics.kompics.Negative;
+import se.sics.kompics.Positive;
+
+import static org.junit.Assert.assertEquals;
 
 public class blockExpect  extends TestHelper{
 

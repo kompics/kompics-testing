@@ -32,8 +32,6 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Request;
 import se.sics.kompics.Response;
 
-import java.util.Comparator;
-
 class TestHelper {
 
   final Direction IN = Direction.IN;
@@ -45,6 +43,14 @@ class TestHelper {
 
   Pong pong(int id) {
     return new Pong(id);
+  }
+
+  SubPing sping(int id) {
+    return new SubPing(id);
+  }
+
+  SubPong spong(int id) {
+    return new SubPong(id);
   }
 
   DirectPing dPing(int id) {
@@ -228,6 +234,24 @@ class TestHelper {
     }
   }
 
+  static class SubPing extends Ping {
+    SubPing(int id) {
+      super(id);
+    }
+
+    @Override
+    public boolean equals(Object o) {return false;}
+  }
+
+  static class SubPong extends Pong {
+    SubPong(int id) {
+      super(id);
+    }
+
+    @Override
+    public boolean equals(Object o) {return false;}
+  }
+
   static class PingRequest extends Request {
     int id;
     PingRequest(int id) {
@@ -297,19 +321,5 @@ class TestHelper {
     }
   }
 
-  class Counter { int count; }
-
-  Comparator<Ping> pingComparator = new Comparator<Ping>() {
-    @Override
-    public int compare(Ping p1, Ping p2) {
-      return p1.id - p2.id;
-    }
-  };
-
-  Comparator<Pong> pongComparator = new Comparator<Pong>() {
-    @Override
-    public int compare(Pong p1, Pong p2) {
-      return p1.id - p2.id;
-    }
-  };
+  static class Counter { int count; }
 }

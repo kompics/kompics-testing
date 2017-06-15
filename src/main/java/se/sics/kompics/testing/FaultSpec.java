@@ -82,4 +82,10 @@ class FaultSpec implements Spec {
     result = 31 * result + direction.hashCode();
     return result;
   }
+
+  @Override
+  public String toString() {
+    return String.format("expectFault(%s)",
+        exceptionType != null? exceptionType : exceptionPredicate);
+  }
 }
