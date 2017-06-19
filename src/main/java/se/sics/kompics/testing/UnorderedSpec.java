@@ -46,7 +46,6 @@ class UnorderedSpec implements MultiEventSpec{
         for (EventSpec e : seen) {
           e.handle();
         }
-        reset();
       }
       return true;
     }
@@ -55,7 +54,11 @@ class UnorderedSpec implements MultiEventSpec{
 
   @Override
   public boolean isComplete() {
-    return seen.isEmpty();
+    if (pending.isEmpty()) {
+      reset();
+      return true;
+    }
+    return false;
   }
 
   private void reset() {

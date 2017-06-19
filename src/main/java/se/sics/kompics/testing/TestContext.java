@@ -51,7 +51,6 @@ public class TestContext<T extends ComponentDefinition> {
   private final Proxy<T> proxy;
   private final ComponentCore proxyComponent;
   private T cut;
-  //private FSM<T> ctrl;
   private CTRL<T> ctrl;
   private Scheduler scheduler;
   private boolean checked;
@@ -218,6 +217,17 @@ public class TestContext<T extends ComponentDefinition> {
 
   public TestContext<T> expectWithMapper() {
     ctrl.setExpectWithMapperMode();
+    return this;
+  }
+
+  public TestContext<T> requestResponse() {
+    ctrl.setExpectWithMapperMode();
+    return this;
+  }
+
+  public TestContext<T> requestResponse(
+      REQUEST_ORDERING request_ordering, RESPONSE_POLICY response_policy) {
+    ctrl.setExpectWithMapperMode(request_ordering, response_policy);
     return this;
   }
 

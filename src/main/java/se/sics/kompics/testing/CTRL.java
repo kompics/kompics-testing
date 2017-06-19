@@ -135,10 +135,21 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   void setExpectWithMapperMode() {
+    expectMapper = new ExpectMapper(proxyComponent);
+    setExpectWithMapperModeHelper();
+  }
+
+  void setExpectWithMapperMode(
+      REQUEST_ORDERING request_ordering, RESPONSE_POLICY response_policy) {
+    expectMapper = new ExpectMapper(proxyComponent,request_ordering, response_policy);
+    setExpectWithMapperModeHelper();
+  }
+
+  // // TODO: 6/19/17 rename
+  private void setExpectWithMapperModeHelper() {
     assertBodyorConditionalMode();
     pushNewMode(EXPECT_MAPPER);
     balancedEnd++;
-    expectMapper = new ExpectMapper(proxyComponent);
   }
 
   <E extends KompicsEvent, R extends KompicsEvent> void setMapperForNext(
@@ -390,7 +401,7 @@ class CTRL<T extends ComponentDefinition> {
       emptySpec = expectFuture.expected.isEmpty();
     } else if (mode == EXPECT_MAPPER) {
       spec = expectMapper;
-      emptySpec = expectMapper.expected.isEmpty();
+      emptySpec = expectMapper.isEmpty();
     } else {
       throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
           EXPECT_FUTURE, EXPECT_MAPPER));

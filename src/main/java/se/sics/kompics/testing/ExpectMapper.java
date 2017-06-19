@@ -27,12 +27,22 @@ import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+
+import static se.sics.kompics.testing.REQUEST_ORDERING.*;
+import static se.sics.kompics.testing.RESPONSE_POLICY.*;
 
 class ExpectMapper implements MultiEventSpec{
 
-  final List<MapperStruct> expected = new ArrayList<MapperStruct>();
-  private int mapperIndex = 0;
+  private final REQUEST_ORDERING request_ordering;
+  private final RESPONSE_POLICY response_policy;
+
+  private final List<MapperStruct> expected = new ArrayList<MapperStruct>();
+
+  private final LinkedList<MapperStruct> pending = new LinkedList<MapperStruct>();
+  private final LinkedList<MapperStruct> received = new LinkedList<MapperStruct>();
 
   private ComponentCore proxyComponent;
 
@@ -42,6 +52,15 @@ class ExpectMapper implements MultiEventSpec{
 
   ExpectMapper(ComponentCore proxyComponent) {
     this.proxyComponent = proxyComponent;
+    request_ordering = ORDERED;
+    response_policy = IMMEDIATE;
+  }
+
+  ExpectMapper(ComponentCore proxyComponent,
+               REQUEST_ORDERING request_ordering, RESPONSE_POLICY response_policy) {
+    this.proxyComponent = proxyComponent;
+    this.request_ordering = request_ordering;
+    this.response_policy = response_policy;
   }
 
   <E extends KompicsEvent, R extends KompicsEvent> void setMapperForNext(
@@ -76,27 +95,73 @@ class ExpectMapper implements MultiEventSpec{
 
   @Override
   public boolean match(EventSpec receivedSpec) {
-    MapperStruct nextMapper = expected.get(mapperIndex);
-
-    if (nextMapper.map(receivedSpec)) {
-      mapperIndex++;
-    } else {
+    MapperStruct mapper = getMapper(receivedSpec);
+    if (mapper == null) {
       return false;
     }
 
-    // messages are not handled until all seen (optionally?)
-    if (mapperIndex == expected.size()) {
-      for (MapperStruct mapper : expected) {
-        mapper.handle();
-      }
-      mapperIndex = 0;
+    if (response_policy == IMMEDIATE) {
+      mapper.doTrigger();
     }
+
+    if (pending.isEmpty()) { // RECEIVE_ALL
+      if (response_policy == RECEIVE_ALL) {
+        for (MapperStruct m : received) {
+          m.doTrigger();
+        }
+      }
+    }
+
     return true;
+  }
+
+  private MapperStruct getMapper(EventSpec receivedSpec) {
+    if (pending.isEmpty()) {
+      return null;
+    }
+    MapperStruct mapper;
+
+    if (request_ordering == ORDERED) {
+      mapper = pending.getFirst();
+      if (mapper.map(receivedSpec)) {
+        pending.removeFirst();
+        received.add(mapper);
+        return mapper;
+      }
+    }
+
+    if (request_ordering == UNORDERED) {
+      Iterator<MapperStruct> it = pending.iterator();
+      while (it.hasNext()) {
+        mapper = it.next();
+        if (mapper.map(receivedSpec)) {
+          it.remove();
+          received.add(mapper);
+          return mapper;
+        }
+      }
+    }
+    return null;
+  }
+
+  private void reset() {
+    assert pending.isEmpty();
+    assert received.size() == expected.size();
+    received.clear();
+    pending.addAll(expected);
   }
 
   @Override
   public boolean isComplete() {
-    return mapperIndex == 0;
+    if (pending.isEmpty()) {
+      reset();
+      return true;
+    }
+    return false;
+  }
+
+  boolean isEmpty() {
+    return expected.isEmpty();
   }
 
   private void addNewMapperStruct(
@@ -105,35 +170,28 @@ class ExpectMapper implements MultiEventSpec{
           Function<? extends KompicsEvent, ? extends KompicsEvent> mapper) {
     MapperStruct mapperStruct = new MapperStruct(eventType, mapper, listenPort, responsePort);
     expected.add(mapperStruct);
+    pending.add(mapperStruct);
   }
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("ExpectWithMapper<Seen(");
-    int i = 0;
-    for (; i < mapperIndex; i++) {
-      MapperStruct m = expected.get(i);
-      sb.append(" ").append(m);
-    }
-
-    sb.append(")Pending(");
-    for (; i < expected.size(); i++) {
-      MapperStruct m = expected.get(i);
-      sb.append(" ").append(m);
-    }
-    sb.append(")>");
+    StringBuilder sb = new StringBuilder("RequestResponse<");
+    sb.append(request_ordering).append(", ").append(response_policy).append(">");
+    sb.append("Pending").append(pending.toString());
+    sb.append("  Received").append(received.toString());
     return sb.toString();
   }
 
   private class MapperStruct {
-    final Class<? extends KompicsEvent> eventType;
-    final Function<? extends KompicsEvent, ? extends KompicsEvent> mapper;
-    final Port<? extends PortType> listenPort;
-    final Port<? extends PortType> responsePort;
+    private final Class<? extends KompicsEvent> eventType;
+    private final Function<? extends KompicsEvent, ? extends KompicsEvent> mapper;
+    private final Port<? extends PortType> listenPort;
+    private final Port<? extends PortType> responsePort;
 
-    EventSpec receivedSpec;
+    private EventSpec receivedSpec;
+    private KompicsEvent response;
 
-    MapperStruct(Class<? extends KompicsEvent> eventType,
+    private MapperStruct(Class<? extends KompicsEvent> eventType,
                  Function<? extends KompicsEvent, ? extends KompicsEvent> mapper,
                  Port<? extends PortType> listenPort,
                  Port<? extends PortType> responsePort) {
@@ -143,26 +201,21 @@ class ExpectMapper implements MultiEventSpec{
       this.responsePort = responsePort;
     }
 
-    boolean map(EventSpec receivedSpec) {
+    private boolean map(EventSpec receivedSpec) {
       if (eventType.isAssignableFrom(receivedSpec.getEvent().getClass())) {
-        this.receivedSpec = receivedSpec;
-        return true;
+        response = getResponse(receivedSpec.getEvent(), mapper);
+        return response != null;
       }
       return false;
     }
 
-    void handle() {
-      KompicsEvent receivedEvent = receivedSpec.getEvent();
-      handleHelper(receivedEvent, mapper);
+    private <E extends KompicsEvent, R extends KompicsEvent> R getResponse(
+        KompicsEvent event, Function<E, R> mapper) {
+      return mapper.apply((E) event);
     }
 
-    <E extends KompicsEvent, R extends KompicsEvent> void handleHelper(
-            KompicsEvent event, Function<E, R> mapper) {
-      KompicsEvent response = mapper.apply((E) event);
-      //// TODO: 4/1/17 fail noisily
-      if (response != null) {
-        responsePort.doTrigger(response, 0, proxyComponent);
-      }
+    private void doTrigger() {
+      responsePort.doTrigger(response, 0, proxyComponent);
     }
 
     @Override
