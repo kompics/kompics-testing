@@ -23,15 +23,20 @@ package se.sics.kompics.testing;
 import se.sics.kompics.ChannelFactory;
 import se.sics.kompics.ControlPort;
 import se.sics.kompics.JavaPort;
+import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.LoopbackPort;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
+import se.sics.kompics.Unsafe;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
+import static se.sics.kompics.testing.Direction.*;
 
 class PortConfig {
 
@@ -85,6 +90,27 @@ class PortConfig {
   boolean isConnectedPort(Port<? extends PortType> port) {
     PortStructure portStruct = portStructs.get(port);
     return !(portStruct == null || portStruct.getConnectedPorts().isEmpty());
+  }
+
+  boolean portDeclaresEvent(
+      Class<? extends KompicsEvent> eventType, Port<? extends PortType> port, Direction direction) {
+    PortStructure portStruct = portStructs.get(port);
+    Collection<Class<? extends KompicsEvent>> declaredEvents;
+    if (portStruct.isProvidedPort) {
+      if (direction == IN) {
+        declaredEvents = Unsafe.getNegativeEvents(port.getPortType());
+      } else {
+        declaredEvents = Unsafe.getPositiveEvents(port.getPortType());
+      }
+    }
+    else {
+      if (direction == IN) {
+        declaredEvents = Unsafe.getPositiveEvents(port.getPortType());
+      } else {
+        declaredEvents = Unsafe.getNegativeEvents(port.getPortType());
+      }
+    }
+    return declaredEvents.contains(eventType);
   }
 
   private boolean isMonitoredPort(Class<? extends PortType> portClass) {
