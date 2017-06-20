@@ -25,6 +25,7 @@ import com.google.common.collect.Multiset;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -44,9 +45,9 @@ class Block {
   private boolean currentlyExecuting;
   private boolean runInit = true;
 
-  private Set<EventSpec> disallowed;
-  private Set<EventSpec> allowed;
-  private Set<EventSpec> dropped;
+  private Set<SingleEventSpec> disallowed;
+  private Set<SingleEventSpec> allowed;
+  private Set<SingleEventSpec> dropped;
 
   private List<SingleEventSpec> expected = new LinkedList<SingleEventSpec>();
   private Multiset<SingleEventSpec> pending = HashMultiset.create();
@@ -76,9 +77,9 @@ class Block {
     if (previousBlock == null) {
       initEmptyBlock();
     } else {
-      this.disallowed = new HashSet<EventSpec>(previousBlock.disallowed);
-      this.allowed = new HashSet<EventSpec>(previousBlock.allowed);
-      this.dropped = new HashSet<EventSpec>(previousBlock.dropped);
+      this.disallowed = new HashSet<SingleEventSpec>(previousBlock.disallowed);
+      this.allowed = new HashSet<SingleEventSpec>(previousBlock.allowed);
+      this.dropped = new HashSet<SingleEventSpec>(previousBlock.dropped);
     }
   }
 
@@ -161,13 +162,23 @@ class Block {
   }
 
   boolean handle(EventSpec receivedSpec) {
+/*    Iterator<SingleEventSpec> it = pending.iterator();
+    while (it.hasNext()) {
+      SingleEventSpec spec = it.next();
+      if (spec.match(receivedSpec)) {
+        it.remove();
+        TestContext.logger.trace("Event {} matched by {}", receivedSpec, status());
+        return true;
+      }
+    }
+    return previousBlock != null && previousBlock.handle(receivedSpec);*/
     int remaining = pending.count(receivedSpec);
     if (remaining == 0) {
       return previousBlock != null && previousBlock.handle(receivedSpec);
     }
 
     pending.remove(receivedSpec);
-    TestContext.logger.trace("Event {} will be handled by {}", receivedSpec, status());
+    TestContext.logger.trace("Event {} matched by {}", receivedSpec, status());
     return true;
   }
 
@@ -184,41 +195,52 @@ class Block {
   }
 
   private void initEmptyBlock() {
-    disallowed = new HashSet<EventSpec>();
-    allowed = new HashSet<EventSpec>();
-    dropped = new HashSet<EventSpec>();
+    disallowed = new HashSet<SingleEventSpec>();
+    allowed = new HashSet<SingleEventSpec>();
+    dropped = new HashSet<SingleEventSpec>();
   }
 
-  void addDisallowedMessage(EventSpec eventSpec) {
-    if (disallowed.add(eventSpec)) {
-      allowed.remove(eventSpec);
-      dropped.remove(eventSpec);
+  void blacklist(SingleEventSpec spec) {
+    if (disallowed.add(spec)) {
+      allowed.remove(spec);
+      dropped.remove(spec);
     }
   }
 
-  void addAllowedMessage(EventSpec eventSpec) {
-    if (allowed.add(eventSpec)) {
-      disallowed.remove(eventSpec);
-      dropped.remove(eventSpec);
+  void whitelist(SingleEventSpec spec) {
+    if (allowed.add(spec)) {
+      disallowed.remove(spec);
+      dropped.remove(spec);
     }
   }
 
-  void addDroppedMessage(EventSpec eventSpec) {
-    if (dropped.add(eventSpec)) {
-      disallowed.remove(eventSpec);
-      allowed.remove(eventSpec);
+  void drop(SingleEventSpec spec) {
+    if (dropped.add(spec)) {
+      disallowed.remove(spec);
+      allowed.remove(spec);
     }
   }
 
-  Collection<EventSpec> getAllowedSpecs() {
-    return allowed;
+  boolean isWhitelisted(EventSpec receivedSpec) {
+    return contains(allowed, receivedSpec);
   }
 
-  Collection<EventSpec> getDisallowedSpecs() {
-    return disallowed;
+  boolean isBlacklisted(EventSpec receivedSpec) {
+    return contains(disallowed, receivedSpec);
   }
-  Collection<EventSpec> getDroppedSpecs() {
-    return dropped;
+
+  boolean isDropped(EventSpec receivedSpec) {
+    return contains(dropped, receivedSpec);
+  }
+
+  private boolean contains(Collection<SingleEventSpec> specs, EventSpec receivedSpec) {
+    return specs.contains(receivedSpec);
+/*    for (SingleEventSpec spec : specs) {
+      if (spec.match(receivedSpec)) {
+        return true;
+      }
+    }
+    return false;*/
   }
 
   @Override

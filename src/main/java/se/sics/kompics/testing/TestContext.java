@@ -187,27 +187,37 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  // expect
   public <P extends  PortType> TestContext<T> expect(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
     checkValidPort(port, direction);
-    ctrl.expectMessage(event, port, direction);
+    ctrl.expect(ctrl.newEventSpec(event, port, direction));
     return this;
   }
 
   public <P extends  PortType, E extends KompicsEvent> TestContext<T> expect(
-          Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
-    checkNotNull(eventType, port, pred, direction);
+          Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, predicate, direction);
     checkValidPort(port, direction);
-    ctrl.expectMessage(eventType, pred, port, direction);
+    ctrl.expect(newPredicateSpec(eventType, predicate, port, direction));
     return this;
   }
 
+  public <P extends  PortType, E extends KompicsEvent> TestContext<T> expect(
+      Class<E> eventType, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.expect(newPredicateSpec(eventType, port, direction));
+    return this;
+  }
+
+  // blockExpect
   public <P extends  PortType> TestContext<T> blockExpect(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
     checkValidPort(port, direction);
-    ctrl.expectWithinBlock(event, port, direction);
+    ctrl.blockExpect(ctrl.newEventSpec(event, port, direction));
     return this;
   }
 
@@ -215,10 +225,24 @@ public class TestContext<T extends ComponentDefinition> {
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
     checkNotNull(eventType, pred, port, direction);
     checkValidPort(port, direction);
-    ctrl.expectWithinBlock(eventType, pred, port, direction);
+    ctrl.blockExpect(newPredicateSpec(eventType, pred, port, direction));
     return this;
   }
 
+  public <P extends  PortType, E extends KompicsEvent> TestContext<T> blockExpect(
+      Class<E> eventType, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.blockExpect(newPredicateSpec(eventType, port, direction));
+    return this;
+  }
+
+  // answer request
+
+  public TestContext<T> answerRequests() {
+    ctrl.answerRequests();
+    return this;
+  }
 
   public <RQ extends KompicsEvent, RS extends KompicsEvent> TestContext<T> answerRequest(
       Class<RQ> requestType, Port<? extends PortType> requestPort,
@@ -226,11 +250,6 @@ public class TestContext<T extends ComponentDefinition> {
     checkNotNull(requestType, requestPort, mapper, responsePort);
     checkValidPort(requestPort, Direction.OUT);
     ctrl.answerRequest(requestType, requestPort, mapper, responsePort);
-    return this;
-  }
-
-  public TestContext<T> answerRequests() {
-    ctrl.answerRequests();
     return this;
   }
 
@@ -266,28 +285,78 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  // // TODO: 3/31/17 allow matching predicate
+  // allow disallow drop
   public <P extends  PortType> TestContext<T> disallow(
             KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
     checkValidPort(port, direction);
-    ctrl.addDisallowedEvent(event, port, direction);
+    ctrl.blacklist(ctrl.newEventSpec(event, port, direction));
     return this;
   }
 
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> disallow(
+      Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.blacklist(newPredicateSpec(eventType, predicate, port, direction));
+    return this;
+  }
+
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> disallow(
+      Class<E> eventType, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.blacklist(newPredicateSpec(eventType, port, direction));
+    return this;
+  }
+
+  // allow
   public <P extends  PortType> TestContext<T> allow(
             KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
     checkValidPort(port, direction);
-    ctrl.addAllowedEvent(event, port, direction);
+    ctrl.whitelist(ctrl.newEventSpec(event, port, direction));
     return this;
   }
 
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> allow(
+      Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.whitelist(newPredicateSpec(eventType, predicate, port, direction));
+    return this;
+  }
+
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> allow(
+      Class<E> eventType, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.whitelist(newPredicateSpec(eventType, port, direction));
+    return this;
+  }
+
+  // drop
   public <P extends  PortType> TestContext<T> drop(
             KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
     checkValidPort(port, direction);
-    ctrl.addDroppedEvent(event, port, direction);
+    ctrl.drop(ctrl.newEventSpec(event, port, direction));
+    return this;
+  }
+
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> drop(
+      Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.drop(newPredicateSpec(eventType, predicate, port, direction));
+    return this;
+  }
+
+  public <E extends KompicsEvent, P extends  PortType> TestContext<T> drop(
+      Class<E> eventType, Port<P> port, Direction direction) {
+    checkNotNull(eventType, port, direction);
+    checkValidPort(port, direction);
+    ctrl.drop(newPredicateSpec(eventType, port, direction));
     return this;
   }
 
@@ -309,6 +378,7 @@ public class TestContext<T extends ComponentDefinition> {
     return cut.getComponentCore();
   }
 
+  // inspect
   public TestContext<T> inspect(
           Predicate<T> assertPred) {
     checkNotNull(assertPred);
@@ -316,17 +386,20 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  // expectFault
   public TestContext<T> expectFault(
           Class<? extends Throwable> exceptionType) {
     checkNotNull(exceptionType);
-    ctrl.expectFault(exceptionType);
+    FaultSpec spec = new FaultSpec(cut.getControlPort(), exceptionType);
+    ctrl.expectFault(spec);
     return this;
   }
 
   public TestContext<T> expectFault(
           Predicate<Throwable> exceptionPredicate) {
     checkNotNull(exceptionPredicate);
-    ctrl.expectFault(exceptionPredicate);
+    FaultSpec spec = new FaultSpec(cut.getControlPort(), exceptionPredicate);
+    ctrl.expectFault(spec);
     return this;
   }
 
@@ -352,7 +425,6 @@ public class TestContext<T extends ComponentDefinition> {
     scheduler = new ThreadPoolScheduler(1);
     Kompics.setScheduler(scheduler);
 
-    // // TODO: 2/20/17 set worker id
     proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
     assert proxyComponent.state() == Component.State.ACTIVE;
   }
@@ -374,9 +446,25 @@ public class TestContext<T extends ComponentDefinition> {
     }
   }
   
-  static void checkNotNull(Object... objects) {
+  private static void checkNotNull(Object... objects) {
     for (Object o : objects) {
       Preconditions.checkNotNull(o);
     }
+  }
+
+  private static <E extends KompicsEvent> PredicateSpec newPredicateSpec(
+      Class<E> eventType, Port<? extends PortType> port, Direction direction) {
+    Predicate<E> predicate = new Predicate<E>() {
+      @Override
+      public boolean apply(E e) {
+        return true;
+      }
+    };
+    return newPredicateSpec(eventType, predicate, port, direction);
+  }
+
+  private static <E extends KompicsEvent> PredicateSpec newPredicateSpec(
+      Class<E> eventType, Predicate<E> predicate, Port<? extends PortType> port, Direction direction) {
+    return new PredicateSpec(eventType, predicate, port, direction);
   }
 }

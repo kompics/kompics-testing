@@ -650,13 +650,13 @@ class NFA {
 
     private Transition handleWithBlockTransitions(EventSpec receivedSpec) {
       logger.debug("{}: looking up {} with constraints {}", this, receivedSpec, block.status());
-      if (block.getAllowedSpecs().contains(receivedSpec)) {
+      if (block.isWhitelisted(receivedSpec)) {
         return new Transition(receivedSpec, this, true);
       }
-      if (block.getDroppedSpecs().contains(receivedSpec)) {
+      if (block.isDropped(receivedSpec)) {
         return new Transition(receivedSpec, this);
       }
-      if (block.getDisallowedSpecs().contains(receivedSpec)) {
+      if (block.isBlacklisted(receivedSpec)) {
         return new Transition(receivedSpec, errorState);
       }
       return null;

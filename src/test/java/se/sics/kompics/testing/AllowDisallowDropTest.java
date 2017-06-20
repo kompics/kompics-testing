@@ -20,6 +20,7 @@
  */
 package se.sics.kompics.testing;
 
+import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
@@ -42,7 +43,7 @@ public class AllowDisallowDropTest extends TestHelper{
     PingerInit pingerInit = new PingerInit(pongsReceived);
     tc = TestContext.newTestContext(Pinger.class, pingerInit);
     pinger = tc.getComponentUnderTest();
-    ponger = tc.create(Ponger.class);
+    ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);
     pongerPort = ponger.getPositive(PingPongPort.class);
     tc.connect(pingerPort, pongerPort);
@@ -50,17 +51,20 @@ public class AllowDisallowDropTest extends TestHelper{
 
   @Test
   public void allowTest() {
-    tc.allow(pong(0), pingerPort, IN)
-        .body()
+    int N = 3;
+    tc.body().repeat(N)
+        .allow(pong(0), pingerPort, IN)
+    .body()
             .trigger(pong(1), pongerPort.getPair())
             .trigger(pong(0), pongerPort.getPair())
             .trigger(pong(2), pongerPort.getPair())
 
             .expect(pong(1), pingerPort, IN)
             .expect(pong(2), pingerPort, IN)
+    .end()
     ;
     assert tc.check();
-    assertEquals(3, pongsReceived.count);
+    assertEquals(N*3, pongsReceived.count);
   }
 
   @Test
@@ -79,17 +83,20 @@ public class AllowDisallowDropTest extends TestHelper{
 
   @Test
   public void dropTest() {
-    tc.drop(pong(0), pingerPort, IN)
-        .body()
+    int N = 3;
+    tc.body().repeat(N)
+        .drop(pong(0), pingerPort, IN)
+    .body()
             .trigger(pong(0), pongerPort.getPair())
             .trigger(pong(1), pongerPort.getPair())
             .trigger(pong(0), pongerPort.getPair())
             .trigger(pong(2), pongerPort.getPair())
             .expect(pong(1), pingerPort, IN)
             .expect(pong(2), pingerPort, IN)
+    .end()
     ;
     assert tc.check();
-    assertEquals(2, pongsReceived.count);
+    assertEquals(N*2, pongsReceived.count);
   }
 
   @Test
@@ -110,5 +117,95 @@ public class AllowDisallowDropTest extends TestHelper{
     ;
     assert tc.check();
     assertEquals(N - 1, pongsReceived.count);
+  }
+
+  @Test
+  public void predicateAllow() {
+    int N = 3;
+    tc.body().repeat(N)
+        .allow(Pong.class, pongPred(0), pingerPort, IN)
+    .body()
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+
+        .expect(pong(1), pingerPort, IN)
+        .expect(pong(2), pingerPort, IN)
+    .end()
+    ;
+    assert tc.check();
+    assertEquals(N*3, pongsReceived.count);
+  }
+
+  @Test
+  public void predicateDisallow() {
+    tc.disallow(Pong.class, pongPred(0), pingerPort, IN).body()
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+        .expect(pong(1), pingerPort, IN)
+        .expect(pong(2), pingerPort, IN)
+    ;
+    assert !tc.check();
+    assertEquals(1, pongsReceived.count);
+  }
+
+  @Test
+  public void predicateDrop() {
+    int N = 3;
+    tc.body().repeat(N)
+        .drop(Pong.class, pongPred(0), pingerPort, IN)
+    .body()
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(1), pongerPort.getPair())
+        .trigger(pong(0), pongerPort.getPair())
+        .trigger(pong(2), pongerPort.getPair())
+
+        .expect(pong(1), pingerPort, IN)
+        .expect(pong(2), pingerPort, IN)
+    .end()
+    ;
+    assert tc.check();
+    assertEquals(N*2, pongsReceived.count);
+  }
+
+  @Test
+  public void matchByClass() {
+    int N = 3;
+    tc.body().repeat(N)
+          .allow(Pong.class, pingerPort, IN)
+          .drop(Ping.class, pingerPort, OUT)
+      .body()
+          .trigger(pong(1), pongerPort.getPair())
+          .trigger(pong(0), pongerPort.getPair())
+          .trigger(ping(0), pingerPort.getPair())
+          .trigger(pong(2), pongerPort.getPair())
+
+          .expect(pong(1), pingerPort, IN)
+          .expect(pong(2), pingerPort, IN)
+      .end()
+    ;
+    assert tc.check();
+    assertEquals(N*3, pongsReceived.count);
+    assertEquals(0, pingsReceived(ponger));
+  }
+
+  @Test
+  public void matchByClassDisallow() {
+    tc.disallow(Pong.class, pingerPort, IN).body()
+        .trigger(pong(1), pongerPort.getPair())
+    ;
+    assert !tc.check();
+    assertEquals(0, pongsReceived.count);
+    assertEquals(0, pingsReceived(ponger));
+  }
+
+  private static Predicate<Pong> pongPred(final int id) {
+    return new Predicate<Pong>() {
+      @Override
+      public boolean apply(Pong pong) {
+        return pong.id == id;
+      }
+    };
   }
 }

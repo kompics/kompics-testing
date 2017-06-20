@@ -44,7 +44,6 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
   private T definitionUnderTest;
   private PortConfig portConfig;
   private Component cut;
-  //private FSM<T> fsm;
   private CTRL<T> fsm;
 
   private Logger logger = TestContext.logger;

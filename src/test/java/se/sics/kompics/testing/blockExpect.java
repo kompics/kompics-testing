@@ -190,13 +190,23 @@ public class blockExpect  extends TestHelper{
   }
 
   @Test
-  public void usesMatchingFunction() {
+  public void matchByPredicate() {
     tc.blockExpect(Ping.class, new Predicate<Ping>() {
       @Override
       public boolean apply(Ping ping) {
         return ping.id == 1;
       }
     }, pingerPort, OUT).body()
+        .trigger(ping(1), pingerPort.getPair())
+    ;
+
+    assert tc.check();
+    assertEquals(1, pingsReceived(ponger));
+  }
+
+  @Test
+  public void matchByClass() {
+    tc.blockExpect(Ping.class, pingerPort, OUT).body()
         .trigger(ping(1), pingerPort.getPair())
     ;
 

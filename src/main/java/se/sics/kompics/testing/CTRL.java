@@ -87,22 +87,19 @@ class CTRL<T extends ComponentDefinition> {
     participants.add(c);
   }
 
-  <P extends PortType> void addDisallowedEvent(
-      KompicsEvent event, Port<P> port, Direction direction) {
+  <P extends PortType> void blacklist(SingleEventSpec spec) {
     assertMode(HEADER);
-    currentBlock.addDisallowedMessage(newEventSpec(event, port, direction));
+    currentBlock.blacklist(spec);
   }
 
-  <P extends  PortType> void addAllowedEvent(
-      KompicsEvent event, Port<P> port, Direction direction) {
+  <P extends  PortType> void whitelist(SingleEventSpec spec) {
     assertMode(HEADER);
-    currentBlock.addAllowedMessage(newEventSpec(event, port, direction));
+    currentBlock.whitelist(spec);
   }
 
-  <P extends  PortType> void addDroppedEvent(
-      KompicsEvent event, Port<P> port, Direction direction) {
+  <P extends  PortType> void drop(SingleEventSpec spec) {
     assertMode(HEADER);
-    currentBlock.addDroppedMessage(newEventSpec(event, port, direction));
+    currentBlock.drop(spec);
   }
 
   <P extends PortType> void expectMessage(
@@ -117,18 +114,14 @@ class CTRL<T extends ComponentDefinition> {
     registerSpec(predicateSpec);
   }
 
-  <P extends PortType> void expectWithinBlock(
-      KompicsEvent event, Port<P> port, Direction direction) {
-    assertMode(HEADER);
-    EventSpec eventSpec = newEventSpec(event, port, direction);
-    currentBlock.expect(eventSpec);
+  <P extends PortType, E extends KompicsEvent> void expect(SingleEventSpec spec) {
+    registerSpec(spec);
   }
 
-  <P extends PortType, E extends KompicsEvent> void expectWithinBlock(
-      Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
+  <P extends PortType, E extends KompicsEvent> void blockExpect(
+      SingleEventSpec spec) {
     assertMode(HEADER);
-    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
-    currentBlock.expect(predicateSpec);
+    currentBlock.expect(spec);
   }
 
   void setUnorderedMode() {
@@ -298,17 +291,8 @@ class CTRL<T extends ComponentDefinition> {
     }
   }
 
-  void expectFault(
-      Class<? extends Throwable> exceptionType) {
+  void expectFault(FaultSpec spec) {
     assertBodyorConditionalMode();
-    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionType);
-    table.addSpec(spec);
-  }
-
-  void expectFault(
-      Predicate<Throwable> exceptionPredicate) {
-    assertBodyorConditionalMode();
-    FaultSpec spec = new FaultSpec(definitionUnderTest.getControlPort(), exceptionPredicate);
     table.addSpec(spec);
   }
 

@@ -27,7 +27,7 @@ import se.sics.kompics.PortType;
 
 class PredicateSpec implements SingleEventSpec{
 
-  final Class<? extends KompicsEvent> eventType;
+  private final Class<? extends KompicsEvent> eventType;
   final Predicate<? extends KompicsEvent> predicate;
   final Port<? extends PortType> port;
   final Direction direction;
@@ -45,6 +45,8 @@ class PredicateSpec implements SingleEventSpec{
   public boolean match(EventSpec receivedSpec) {
     KompicsEvent receivedEvent = receivedSpec.getEvent();
     return eventType.equals(receivedEvent.getClass()) &&
+            port.equals(receivedSpec.getPort()) &&
+            direction.equals(receivedSpec.getDirection()) &&
            matchHelper(predicate, receivedEvent);
   }
 
@@ -59,10 +61,7 @@ class PredicateSpec implements SingleEventSpec{
       return false;
     }
     EventSpec eventSpec = (EventSpec) o;
-
-    return match(eventSpec) &&
-           port.equals(eventSpec.getPort()) &&
-           direction.equals(eventSpec.getDirection());
+    return match(eventSpec);
   }
 
   @Override
