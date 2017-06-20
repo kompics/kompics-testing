@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
 import com.google.common.base.Function;
@@ -49,7 +50,7 @@ import static se.sics.kompics.testing.Block.MODE.*;
 import static se.sics.kompics.testing.Block.STAR;
 
 class CTRL<T extends ComponentDefinition> {
-  static final Logger logger = TestContext.logger;
+  private static final Logger logger = TestContext.logger;
 
   private final T definitionUnderTest;
   private final EventQueue eventQueue;
@@ -59,8 +60,11 @@ class CTRL<T extends ComponentDefinition> {
   private final ComponentCore proxyComponent;
   private Collection<Component> participants = new HashSet<Component>();
 
-  private ExpectMapper expectMapper;
-  private ExpectFuture expectFuture;
+  private ArrayList<AnswerRequestSpec> requestSequence;
+  private Set<Future<? extends KompicsEvent, ? extends KompicsEvent>> futures =
+      new HashSet<Future<? extends KompicsEvent, ? extends KompicsEvent>>();
+
+  private boolean unorderedModeImmediateResponse;
   private List<SingleEventSpec> expectUnordered = new ArrayList<SingleEventSpec>();
   private ComparatorMap comparators = new ComparatorMap();
 
@@ -128,72 +132,106 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   void setUnorderedMode() {
+    setUnorderedMode(true);
+  }
+
+  void setUnorderedMode(boolean immediateResponse) {
+    unorderedModeImmediateResponse = immediateResponse;
     assertBodyorConditionalMode();
     pushNewMode(UNORDERED);
     expectUnordered = new ArrayList<SingleEventSpec>();
     balancedEnd++;
   }
 
-  void setExpectWithMapperMode() {
-    expectMapper = new ExpectMapper(proxyComponent);
-    setExpectWithMapperModeHelper();
+  // answer requests
+  <RQ extends KompicsEvent, RS extends KompicsEvent> void answerRequest(
+      Class<RQ> requestType, Port<? extends PortType> requestPort,
+      Function<RQ, RS> mapper, Port<? extends PortType> responsePort) {
+    boolean immediateResponse;
+    boolean unorderedMode = currentMode == UNORDERED;
+
+    if (unorderedMode) {
+      immediateResponse = unorderedModeImmediateResponse;
+    } else {
+      boolean answerReqMode = currentMode == ANSWER_REQUEST;
+      if (!answerReqMode) {
+        assertBodyorConditionalMode();
+      }
+      immediateResponse = !answerReqMode;
+    }
+
+    AnswerRequestSpec answerRequestSpec = new AnswerRequestSpec(
+        requestType, requestPort, mapper, responsePort,
+        immediateResponse, proxyComponent);
+
+    if (unorderedMode) {
+      expectUnordered.add(answerRequestSpec);
+    } else {
+      if (!immediateResponse) {
+        assert requestSequence != null;
+        requestSequence.add(answerRequestSpec);
+        answerRequestSpec.requestSequence = requestSequence;
+      }
+      table.addSpec(answerRequestSpec);
+    }
   }
 
-  void setExpectWithMapperMode(
-      REQUEST_ORDERING request_ordering, RESPONSE_POLICY response_policy) {
-    expectMapper = new ExpectMapper(proxyComponent,request_ordering, response_policy);
-    setExpectWithMapperModeHelper();
-  }
-
-  // // TODO: 6/19/17 rename
-  private void setExpectWithMapperModeHelper() {
-    assertBodyorConditionalMode();
-    pushNewMode(EXPECT_MAPPER);
+  void answerRequests() {
+    assertMode(BODY);
+    setMode(ANSWER_REQUEST);
+    requestSequence = new ArrayList<AnswerRequestSpec>();
     balancedEnd++;
   }
 
-  <E extends KompicsEvent, R extends KompicsEvent> void setMapperForNext(
-      int expectedEvents, Class<E> eventType, Function<E, R> mapper) {
-    assertMode(EXPECT_MAPPER);
-    expectMapper.setMapperForNext(expectedEvents, eventType, mapper);
+  private void endAnswerRequestMode() {
+    setMode(BODY);
+    if (!requestSequence.isEmpty()) {
+      requestSequence.get(requestSequence.size() - 1).isFinalRequest = true;
+    }
+    requestSequence = null;
+    balancedEnd--;
   }
 
-  void addExpectWithMapper(
-      Port<? extends PortType> listenPort, Port<? extends PortType> responsePort) {
-    assertMode(EXPECT_MAPPER);
-    expectMapper.addExpectedEvent(listenPort, responsePort);
-  }
+  <RQ extends KompicsEvent> void answerRequest(
+      Class<RQ> requestType, Port<? extends PortType> requestPort,
+      Future<RQ, ? extends KompicsEvent> future) {
+    if (currentMode != UNORDERED)  {
+      assertBodyorConditionalMode();
+    }
 
-  <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithMapper(
-      Class<E> eventType, Port<? extends PortType> listenPort,
-      Port<? extends PortType> responsePort, Function<E, R> mapper) {
-    assertMode(EXPECT_MAPPER);
-    expectMapper.addExpectedEvent(eventType, listenPort, responsePort, mapper);
-  }
+    if (futures.contains(future)) {
+      throw new IllegalArgumentException("Future can only be used once");
+    }
 
-  void setExpectWithFutureMode() {
-    assertBodyorConditionalMode();
-    pushNewMode(EXPECT_FUTURE);
-    //// TODO: 4/25/17 move to decrement function
-    balancedEnd++;
-    expectFuture = new ExpectFuture(proxyComponent);
-  }
+    futures.add(future);
+    AnswerRequestSpec answerRequestSpec = new AnswerRequestSpec(
+        requestType, requestPort, future, proxyComponent);
 
-  <E extends KompicsEvent, R extends KompicsEvent> void addExpectWithFuture(
-      Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
-    assertMode(EXPECT_FUTURE);
-    expectFuture.addExpectedEvent(eventType, listenPort, future);
+    if (currentMode == UNORDERED) {
+      expectUnordered.add(answerRequestSpec);
+    } else {
+      table.addSpec(answerRequestSpec);
+    }
   }
 
   <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void trigger(
       Port<P> responsePort, Future<E, R> future) {
-    assertMode(EXPECT_FUTURE);
-    expectFuture.addTrigger(responsePort, future);
+/*    assertMode(EXPECT_FUTURE);
+
+    expectFuture.addTrigger(responsePort, future);*/
+
+    assertBodyorConditionalMode();
+    if (!futures.contains(future)) {
+      throw new IllegalArgumentException("Future must be used in a previous method");
+    }
+
+    InternalEventSpec spec = new InternalEventSpec(future, responsePort);
+    table.addSpec(spec);
   }
 
   void trigger(KompicsEvent event, Port<? extends PortType> port) {
-    InternalEventSpec spec = new InternalEventSpec(event, port);
     assertBodyorConditionalMode();
+    InternalEventSpec spec = new InternalEventSpec(event, port);
     table.addSpec(spec);
   }
 
@@ -246,17 +284,14 @@ class CTRL<T extends ComponentDefinition> {
       case UNORDERED:
         endUnorderedMode();
         break;
-      case EXPECT_MAPPER:
-        endExpect(currentMode);
-        break;
-      case EXPECT_FUTURE:
-        endExpect(currentMode);
-        break;
       case CONDITIONAL:
         endConditional();
         break;
       case BODY:
         endRepeat();
+        break;
+      case ANSWER_REQUEST:
+        endAnswerRequestMode();
         break;
       default:
         throw new IllegalStateException("END not allowed in mode " + currentMode);
@@ -385,31 +420,10 @@ class CTRL<T extends ComponentDefinition> {
     if (expectUnordered.isEmpty()) {
       throw new IllegalStateException("No events were specified in unordered mode");
     }
-    UnorderedSpec spec = new UnorderedSpec(expectUnordered);
+    UnorderedSpec spec = new UnorderedSpec(expectUnordered, unorderedModeImmediateResponse);
     table.addSpec(spec);
     currentMode = previousMode.pop();
     balancedEnd--;
-  }
-
-  private void endExpect(MODE mode) {
-    Spec spec;
-    boolean emptySpec;
-    balancedEnd--;
-    currentMode = previousMode.pop();
-    if (mode == EXPECT_FUTURE) {
-      spec = expectFuture;
-      emptySpec = expectFuture.expected.isEmpty();
-    } else if (mode == EXPECT_MAPPER) {
-      spec = expectMapper;
-      emptySpec = expectMapper.isEmpty();
-    } else {
-      throw new IllegalStateException(String.format("Expected [%s] or [%s] mode",
-          EXPECT_FUTURE, EXPECT_MAPPER));
-    }
-    if (emptySpec) {
-      throw new IllegalStateException("No events were specified in " + mode + " mode");
-    }
-    table.addSpec(spec);
   }
 
   private void endRepeat() {
@@ -451,10 +465,14 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   private void assertBodyorConditionalMode() {
-    if (!(currentMode == BODY || currentMode == CONDITIONAL)) {
+    assertEitherMode(BODY, CONDITIONAL);
+  }
+
+  private void assertEitherMode(MODE mode1, MODE mode2) {
+    if (!(currentMode == mode1 || currentMode == mode2)) {
       throw new IllegalStateException(
           String.format("Expected mode [%s] or [%s], Current mode [%s]",
-              BODY, CONDITIONAL, currentMode));
+              mode1, mode2, currentMode));
     }
   }
 

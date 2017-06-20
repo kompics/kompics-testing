@@ -34,6 +34,8 @@ class EventSpec implements SingleEventSpec{
   private final Port<? extends PortType> port;
   private final Direction direction;
 
+  private boolean enabled = true; // forward event
+
   <E extends KompicsEvent> EventSpec(E event, Port<? extends PortType> port,
             Direction direction, Comparator<E> comparator) {
     this.port = port;
@@ -64,7 +66,14 @@ class EventSpec implements SingleEventSpec{
   }
 
   void handle() {
-    handler.doHandle(event);
+    if (enabled) {
+      handler.doHandle(event); // handle once
+      disable();
+    }
+  }
+
+  void disable() {
+    enabled = false;
   }
 
   @Override

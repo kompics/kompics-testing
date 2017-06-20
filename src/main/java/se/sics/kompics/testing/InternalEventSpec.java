@@ -39,6 +39,7 @@ class InternalEventSpec implements Spec {
   private boolean trigger;
   private KompicsEvent event;
   private Port<? extends PortType> port;
+  private Future<? extends KompicsEvent, ? extends KompicsEvent> future; // or use future
 
   <T extends ComponentDefinition> InternalEventSpec(T definitionUnderTest, Predicate<T> inspectPredicate) {
     this.definitionUnderTest = definitionUnderTest;
@@ -49,6 +50,14 @@ class InternalEventSpec implements Spec {
   InternalEventSpec(KompicsEvent event, Port<? extends PortType> port) {
     this.event = event;
     this.port = port;
+    trigger = true;
+  }
+
+  InternalEventSpec(
+      Future<? extends KompicsEvent, ? extends KompicsEvent> future,
+      Port<? extends PortType> port) {
+    this.port = port;
+    this.future = future;
     trigger = true;
   }
 
@@ -68,6 +77,12 @@ class InternalEventSpec implements Spec {
   }
 
   private String doTrigger() {
+    if (event == null) {
+      event = future.get();
+      if (event == null) {
+        return String.format("Invalid return value from Future %s", future);
+      }
+    }
     logger.debug("triggered({})\t", event);
     port.doTrigger(event, 0, port.getOwner());
     return null;
@@ -77,7 +92,6 @@ class InternalEventSpec implements Spec {
     logger.debug("Inspecting Component");
     JavaComponent cut = (JavaComponent) definitionUnderTest.getComponentCore();
 
-    // // TODO: 3/31/17 do not poll
     while (cut.workCount.get() > 0) {
       try {
         Thread.sleep(100);

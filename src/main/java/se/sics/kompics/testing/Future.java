@@ -24,7 +24,7 @@ import se.sics.kompics.KompicsEvent;
 
 abstract class Future<E extends KompicsEvent, R extends KompicsEvent> {
 
-  public abstract void set(E request);
+  public abstract boolean set(E request);
   public abstract R get();
 
   @Override

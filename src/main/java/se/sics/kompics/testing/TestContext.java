@@ -31,7 +31,6 @@ import se.sics.kompics.ChannelFactory;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.Fault;
 import se.sics.kompics.Init;
 import se.sics.kompics.Kompics;
 import se.sics.kompics.KompicsEvent;
@@ -183,6 +182,11 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  public TestContext<T> unordered(boolean immediateResponse) {
+    ctrl.setUnorderedMode(immediateResponse);
+    return this;
+  }
+
   public <P extends  PortType> TestContext<T> expect(
           KompicsEvent event, Port<P> port, Direction direction) {
     checkNotNull(event, port, direction);
@@ -215,56 +219,26 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> expectWithMapper() {
-    ctrl.setExpectWithMapperMode();
+
+  public <RQ extends KompicsEvent, RS extends KompicsEvent> TestContext<T> answerRequest(
+      Class<RQ> requestType, Port<? extends PortType> requestPort,
+      Function<RQ, RS> mapper, Port<? extends PortType> responsePort) {
+    checkNotNull(requestType, requestPort, mapper, responsePort);
+    checkValidPort(requestPort, Direction.OUT);
+    ctrl.answerRequest(requestType, requestPort, mapper, responsePort);
     return this;
   }
 
-  public TestContext<T> requestResponse() {
-    ctrl.setExpectWithMapperMode();
+  public TestContext<T> answerRequests() {
+    ctrl.answerRequests();
     return this;
   }
 
-  public TestContext<T> requestResponse(
-      REQUEST_ORDERING request_ordering, RESPONSE_POLICY response_policy) {
-    ctrl.setExpectWithMapperMode(request_ordering, response_policy);
-    return this;
-  }
-
-  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> setMapperForNext(
-          int expectedEvents, Class<E> eventType, Function<E, R> mapper) {
-    checkNotNull(eventType, mapper);
-    ctrl.setMapperForNext(expectedEvents, eventType, mapper);
-    return this;
-  }
-
-  public TestContext<T> expect(
-          Port<? extends PortType> listenPort, Port<? extends PortType> responsePort) {
-    checkNotNull(listenPort, responsePort);
-    checkValidPort(listenPort, Direction.OUT);
-    ctrl.addExpectWithMapper(listenPort, responsePort);
-    return this;
-  }
-
-  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> expect(
-          Class<E> eventType, Port<? extends PortType> listenPort,
-          Port<? extends PortType> responsePort, Function<E, R> mapper) {
-    checkNotNull(eventType, listenPort, responsePort, mapper);
-    checkValidPort(listenPort, Direction.OUT);
-    ctrl.addExpectWithMapper(eventType, listenPort, responsePort, mapper);
-    return this;
-  }
-
-  public TestContext<T> expectWithFuture() {
-    ctrl.setExpectWithFutureMode();
-    return this;
-  }
-
-  public <E extends KompicsEvent, R extends KompicsEvent> TestContext<T> expect(
-          Class<E> eventType, Port<? extends PortType> listenPort, Future<E, R> future) {
-    checkNotNull(eventType, listenPort, future);
-    checkValidPort(listenPort, Direction.OUT);
-    ctrl.addExpectWithFuture(eventType, listenPort, future);
+  public <RQ extends KompicsEvent, RS extends KompicsEvent> TestContext<T> answerRequest(
+      Class<RQ> eventType, Port<? extends PortType> requestPort, Future<RQ, RS> future) {
+    checkNotNull(eventType, requestPort, future);
+    checkValidPort(requestPort, Direction.OUT);
+    ctrl.answerRequest(eventType, requestPort, future);
     return this;
   }
 

@@ -98,7 +98,6 @@ public class ConditionalTest {
     tc.expect(ping(6), pingerPort, OUT).end(); // end repeat
 
     assert tc.check();
-    //assertEquals(tc.check(), tc.getFinalState());
   }
 
   @Test
@@ -353,25 +352,20 @@ public class ConditionalTest {
     tc.either()
         .expect(ping(4), pingerPort, OUT)
 
-        .expectWithMapper()
-            .setMapperForNext(2, Ping.class, pingPongMapper)
-            .expect(pingerPort, pingerPort)
-            .expect(Ping.class, pingerPort, pingerPort, pingPongMapper)
-            .expect(pingerPort, pingerPort)
-        .end()
+        .answerRequest(Ping.class, pingerPort, pingPongMapper, pingerPort)
+        .answerRequest(Ping.class, pingerPort, pingPongMapper, pingerPort)
+        .answerRequest(Ping.class, pingerPort, pingPongMapper, pingerPort)
 
         .expect(ping(5), pingerPort, OUT)
     .or()
         .expect(ping(6), pingerPort, OUT)
 
-        .expectWithFuture()
-            .expect(Ping.class, pingerPort, future1)
-            .expect(Ping.class, pingerPort, future2)
-            .expect(Ping.class, pingerPort, future3)
-            .trigger(pingerPort, future2)
-            .trigger(pingerPort, future1)
-            .trigger(pingerPort, future3)
-        .end()
+        .answerRequest(Ping.class, pingerPort, future1)
+        .answerRequest(Ping.class, pingerPort, future2)
+        .answerRequest(Ping.class, pingerPort, future3)
+        .trigger(pingerPort, future2)
+        .trigger(pingerPort, future1)
+        .trigger(pingerPort, future3)
 
         .expect(ping(7), pingerPort, OUT)
     .end();
@@ -379,14 +373,6 @@ public class ConditionalTest {
 
     assert tc.check();
   }
-
-/*  @Test
-  public void conditionalTriggerAmbiguousTest() {
-    tc.body();
-    tc.trigger(pong(4), pongerPort.getPair());
-    tc.trigger(pong(3), pongerPort.getPair());
-    conditionalTrigger();
-  }*/
 
   @Test
   public void conditionalTriggerInternalTransitionTest() {
@@ -488,10 +474,6 @@ public class ConditionalTest {
   @Test
   public void conditionalKleeneTest() {
     tc.body()
-/*        .repeat(3)
-        .body()
-            .trigger(ping(0), pingerPort.getPair())
-        .end()*/
         .either()
             .repeat()
             .body()
@@ -513,8 +495,9 @@ public class ConditionalTest {
     Pong pong;
 
     @Override
-    public void set(Ping request) {
+    public boolean set(Ping request) {
       pong = pingPongMapper.apply(request);
+      return true;
     }
 
     @Override

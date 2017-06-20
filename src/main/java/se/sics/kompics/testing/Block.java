@@ -31,8 +31,7 @@ import java.util.Set;
 
 class Block {
 
-  final int times;
-  private int startState;
+  private final int times;
   private int currentCount;
   static final int STAR = -1;
   private boolean isMainBlock;
@@ -53,9 +52,7 @@ class Block {
   private Multiset<SingleEventSpec> pending = HashMultiset.create();
   private Multiset<SingleEventSpec> received = HashMultiset.create();
 
-  enum MODE { HEADER, BODY, UNORDERED, EXPECT_MAPPER, EXPECT_FUTURE, CONDITIONAL}
-  MODE mode = MODE.HEADER;
-  MODE previousMode;
+  enum MODE { HEADER, BODY, UNORDERED, ANSWER_REQUEST, CONDITIONAL}
 
   Block(Block previousBlock, int count, BlockInit blockInit) {
     this(previousBlock, count);
@@ -85,16 +82,6 @@ class Block {
     }
   }
 
-  Block(Block previousBlock, int times, int startState) {
-    this(previousBlock, times);
-    this.startState = startState;
-    throw new UnsupportedOperationException("deprecate block");
-  }
-
-  void setIterationInit(BlockInit iterationInit) {
-    throw new UnsupportedOperationException("deprecate iterinit");
-  }
-
   int getCurrentCount() {
     return currentCount;
   }
@@ -113,7 +100,6 @@ class Block {
   }
 
   void iterationComplete() {
-    //assert isOpen();
     assert pending.isEmpty();
     resetBlockEvents();
 
@@ -167,10 +153,6 @@ class Block {
 
   boolean hasMoreIterations() {
     return currentCount > 0;
-  }
-
-  int indexOfFirstState() {
-    return startState + 1;
   }
 
   void expect(SingleEventSpec spec) {

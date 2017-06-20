@@ -20,36 +20,59 @@
  */
 package se.sics.kompics.testing;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 class UnorderedSpec implements MultiEventSpec{
 
-  private final List<SingleEventSpec> expectUnordered;
+  private final List<SingleEventSpec> eventSpecs;
   private List<SingleEventSpec> pending;
-  private List<EventSpec> seen;
+  private List<SingleEventSpec> received;
+  private List<AnswerRequestSpec> answerRequestSpecs;
 
-  UnorderedSpec(List<SingleEventSpec> expectUnordered) {
-    this.expectUnordered = expectUnordered;
-    seen = new LinkedList<EventSpec>();
-    pending = new LinkedList<SingleEventSpec>(expectUnordered);
+  private final boolean immediateResponse;
+
+  UnorderedSpec(List<SingleEventSpec> eventSpecs, boolean immediateResponse) {
+    this.eventSpecs = eventSpecs;
+    this.immediateResponse = immediateResponse;
+    pending = new LinkedList<SingleEventSpec>(eventSpecs);
+    received = new LinkedList<SingleEventSpec>();
   }
 
   @Override
   public boolean match(EventSpec receivedSpec) {
-    if (pending.contains(receivedSpec)) {
-      int index = pending.indexOf(receivedSpec);
-      seen.add(receivedSpec);
-      pending.remove(index);
+    Iterator<SingleEventSpec> it = pending.iterator();
+    boolean foundMatch = false;
 
-      if (pending.isEmpty()) {
-        for (EventSpec e : seen) {
-          e.handle();
+    // if any symbol matches, add to received list or handle immediately
+    // remove matched symbol
+    while (it.hasNext()) {
+      SingleEventSpec spec = it.next();
+      if (spec.match(receivedSpec)) {
+        foundMatch = true;
+        if (immediateResponse) {
+          receivedSpec.handle();
+        } else {
+          received.add(spec instanceof AnswerRequestSpec? spec :receivedSpec);
+        }
+
+        it.remove();
+        break;
+      }
+    }
+
+    // if all received, handle as requested
+    if (pending.isEmpty() && !immediateResponse) {
+      for (SingleEventSpec spec : received) {
+        if (spec instanceof AnswerRequestSpec) {
+          ((AnswerRequestSpec) spec).triggerResponse();
+        } else {
+          ((EventSpec)spec).handle();
         }
       }
-      return true;
     }
-    return false;
+    return foundMatch;
   }
 
   @Override
@@ -62,22 +85,13 @@ class UnorderedSpec implements MultiEventSpec{
   }
 
   private void reset() {
-    for (SingleEventSpec spec : expectUnordered) {
-      pending.add(spec);
-    }
-    seen.clear();
+    pending.addAll(eventSpecs);
+    received.clear();
   }
 
   public String toString() {
-    StringBuilder sb = new StringBuilder("Unordered<Seen(");
-    for (EventSpec e : seen) {
-      sb.append(" ").append(e);
-    }
-    sb.append(")Pending(");
-    for (Spec e : pending) {
-      sb.append(" ").append(e);
-    }
-    sb.append(")>");
+    StringBuilder sb = new StringBuilder("Unordered<Pending");
+    sb.append(pending.toString()).append(" Received").append(received.toString()).append(">");
     return sb.toString();
   }
 
