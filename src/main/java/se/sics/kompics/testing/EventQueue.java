@@ -29,9 +29,6 @@ class EventQueue {
   private final LinkedBlockingDeque<EventSpec> q = new LinkedBlockingDeque<EventSpec>();
 
   void setTimeout(long timeout) {
-    if (timeout < 0) {
-      throw new IllegalStateException("Negative timeout");
-    }
     this.timeoutMS = timeout;
   }
 
