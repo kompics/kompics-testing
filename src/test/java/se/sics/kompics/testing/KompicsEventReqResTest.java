@@ -51,7 +51,7 @@ public class KompicsEventReqResTest extends TestHelper{
 
   @Test
   public void outgoingRequestTest() {
-    TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
+    TestContext<Pinger> tc = TestContext.newInstance(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
     pinger2 = tc.create(Pinger.class, new PingerInit(new Counter()));
     ponger = tc.create(Ponger.class);
@@ -74,7 +74,7 @@ public class KompicsEventReqResTest extends TestHelper{
 
   @Test
   public void outgoingResponseTest() {
-    TestContext<Ponger> tc = TestContext.newTestContext(Ponger.class);
+    TestContext<Ponger> tc = TestContext.newInstance(Ponger.class);
     ponger = tc.getComponentUnderTest();
     pinger = tc.create(Pinger.class, new PingerInit(new Counter()));
     pinger2 = tc.create(Pinger.class, new PingerInit(new Counter()));

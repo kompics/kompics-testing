@@ -20,7 +20,6 @@
  */
 package se.sics.kompics.testing;
 
-import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
@@ -47,7 +46,7 @@ public class KleeneTest extends TestHelper{
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
+    tc = TestContext.newInstance(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);

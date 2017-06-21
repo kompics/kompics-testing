@@ -159,7 +159,7 @@ public class PingerPongerTest {
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(Pinger.class, Init.NONE);
+    tc = TestContext.newInstance(Pinger.class, Init.NONE);
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, Init.NONE);
     pingerPort = pinger.getNegative(PingPongPort.class);

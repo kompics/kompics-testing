@@ -37,7 +37,7 @@ public class ExpectFaultTest extends TestHelper{
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(TestHelper.Pinger.class, new PingerInit(new Counter()));
+    tc = TestContext.newInstance(TestHelper.Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(TestHelper.Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(TestHelper.PingPongPort.class);

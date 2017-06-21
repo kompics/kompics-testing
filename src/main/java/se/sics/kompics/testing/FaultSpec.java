@@ -51,7 +51,6 @@ class FaultSpec implements Spec {
     if (!(receivedSpec.getEvent() instanceof Fault)) {
       return false;
     }
-    // // TODO: 4/22/17 log error messages in case of failure
     Fault fault = (Fault) receivedSpec.getEvent();
     Throwable exception = fault.getCause();
     if (exceptionType != null) {

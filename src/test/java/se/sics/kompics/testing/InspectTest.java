@@ -26,8 +26,6 @@ import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.Negative;
 
-import static se.sics.kompics.testing.Direction.*;
-
 public class InspectTest extends TestHelper{
 
   private TestContext<Pinger> tc;
@@ -38,7 +36,7 @@ public class InspectTest extends TestHelper{
   @Before
   public void init() {
     counter = new Counter();
-    tc = TestContext.newTestContext(Pinger.class, new PingerInit(counter));
+    tc = TestContext.newInstance(Pinger.class, new PingerInit(counter));
     Component pinger = tc.getComponentUnderTest();
     pingerPort = pinger.getNegative(PingPongPort.class);
   }

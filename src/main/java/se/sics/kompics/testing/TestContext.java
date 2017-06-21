@@ -46,6 +46,10 @@ import se.sics.kompics.scheduler.ThreadPoolScheduler;
 import java.util.Comparator;
 
 
+/**
+ * @author Ifeanyi Ubah
+ * @param <T> the ComponentDefinition to test
+ */
 public class TestContext<T extends ComponentDefinition> {
   private final Proxy<T> proxy;
   private final ComponentCore proxyComponent;
@@ -54,8 +58,9 @@ public class TestContext<T extends ComponentDefinition> {
   private Scheduler scheduler;
   private boolean checked;
 
-  public static final Logger logger = LoggerFactory.getLogger("KompicsTesting");
+  static final Logger logger = LoggerFactory.getLogger("KompicsTesting");
 
+  // constructor
   private TestContext(Init<? extends ComponentDefinition> initEvent, Class<T> definition) {
     proxy = new Proxy<T>();
     proxyComponent = proxy.getComponentCore();
@@ -76,22 +81,38 @@ public class TestContext<T extends ComponentDefinition> {
     this(initEvent, definition);
   }
 
-  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
-      Class<T> definition, Init<T> initEvent) {
-    checkNotNull(definition, initEvent);
-    return new TestContext<T>(definition, initEvent);
-  }
-  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
-      Class<T> definition) {
-    return newTestContext(definition, Init.NONE);
-  }
-
-  public static <T extends ComponentDefinition> TestContext<T> newTestContext(
-      Class<T> definition, Init.None initEvent) {
-    checkNotNull(definition, initEvent);
-    return new TestContext<T>(definition, initEvent);
+  // factory
+  /**
+   *  Returns a new <code>TestContext</code> instance for the specified <code>ComponentDefinition</code>
+   * @param componentDefinition  <code>ComponentDefinition</code> class to test
+   * @param init        Init
+   * @param <T>         <code>ComponentDefinition</code> type
+   * @return a new <code>TestContext</code> instance for the specified <code>ComponentDefinition</code>
+   */
+  public static <T extends ComponentDefinition> TestContext<T> newInstance(
+      Class<T> componentDefinition, Init<T> init) {
+    checkNotNull(componentDefinition, init);
+    return new TestContext<T>(componentDefinition, init);
   }
 
+  /**
+   * Returns a new <code>TestContext</code> instance for the specified <code>ComponentDefinition</code>
+   * @param componentDefinition
+   * @param <T>
+   * @return
+   */
+  public static <T extends ComponentDefinition> TestContext<T> newInstance(
+      Class<T> componentDefinition) {
+    return newInstance(componentDefinition, Init.NONE);
+  }
+
+  public static <T extends ComponentDefinition> TestContext<T> newInstance(
+      Class<T> definition, Init.None init) {
+    checkNotNull(definition, init);
+    return new TestContext<T>(definition, init);
+  }
+
+  // create
   public <T extends ComponentDefinition> Component create(
           Class<T> definition, Init<T> initEvent) {
     checkNotNull(definition, initEvent);
@@ -112,6 +133,7 @@ public class TestContext<T extends ComponentDefinition> {
     return c;
   }
 
+  // connect
   public <P extends PortType> TestContext<T> connect(
           Negative<P> negative, Positive<P> positive) {
     return connect(positive, negative);
@@ -145,6 +167,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
+  // repeat
   public TestContext<T> repeat(int times) {
     ctrl.repeat(times);
     return this;
@@ -167,23 +190,15 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public TestContext<T> end() {
-    ctrl.end();
-    return this;
-  }
-
+  // body
   public TestContext<T> body() {
     ctrl.body();
     return this;
   }
 
-  public TestContext<T> unordered() {
-    ctrl.setUnorderedMode();
-    return this;
-  }
-
-  public TestContext<T> unordered(boolean immediateResponse) {
-    ctrl.setUnorderedMode(immediateResponse);
+  // end
+  public TestContext<T> end() {
+    ctrl.end();
     return this;
   }
 
@@ -209,6 +224,32 @@ public class TestContext<T extends ComponentDefinition> {
     checkNotNull(eventType, port, direction);
     checkValidPort(eventType, port, direction);
     ctrl.expect(newPredicateSpec(eventType, port, direction));
+    return this;
+  }
+
+  // trigger
+  public <P extends PortType> TestContext<T> trigger(
+      KompicsEvent event, Port<P> port) {
+    checkNotNull(event, port);
+    ctrl.trigger(event, port);
+    return this;
+  }
+
+  public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> TestContext<T> trigger(
+      Port<P> responsePort, Future<E, R> future) {
+    checkNotNull(responsePort, future);
+    ctrl.trigger(responsePort, future);
+    return this;
+  }
+
+  // unordered
+  public TestContext<T> unordered() {
+    ctrl.setUnorderedMode();
+    return this;
+  }
+
+  public TestContext<T> unordered(boolean immediateResponse) {
+    ctrl.setUnorderedMode(immediateResponse);
     return this;
   }
 
@@ -261,13 +302,7 @@ public class TestContext<T extends ComponentDefinition> {
     return this;
   }
 
-  public <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> TestContext<T> trigger(
-          Port<P> responsePort, Future<E, R> future) {
-    checkNotNull(responsePort, future);
-    ctrl.trigger(responsePort, future);
-    return this;
-  }
-
+  // either-or
   public TestContext<T> either() {
     ctrl.either();
     return this;
@@ -275,13 +310,6 @@ public class TestContext<T extends ComponentDefinition> {
 
   public TestContext<T> or() {
     ctrl.or();
-    return this;
-  }
-
-  public <P extends PortType> TestContext<T> trigger(
-          KompicsEvent event, Port<P> port) {
-    checkNotNull(event, port);
-    ctrl.trigger(event, port);
     return this;
   }
 
@@ -363,7 +391,7 @@ public class TestContext<T extends ComponentDefinition> {
   public <E extends KompicsEvent> TestContext<T> setComparator(
           Class<E> eventType, Comparator<E> comparator) {
     checkNotNull(eventType, comparator);
-    ctrl.addComparator(eventType, comparator);
+    ctrl.setComparator(eventType, comparator);
     return this;
   }
 
@@ -379,10 +407,9 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   // inspect
-  public TestContext<T> inspect(
-          Predicate<T> assertPred) {
-    checkNotNull(assertPred);
-    ctrl.inspect(assertPred);
+  public TestContext<T> inspect(Predicate<T> predicate) {
+    checkNotNull(predicate);
+    ctrl.inspect(predicate);
     return this;
   }
 
@@ -404,7 +431,7 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   public TestContext<T> setTimeout(long timeoutMS) {
-    proxy.eventQueue.setTimeout(timeoutMS);
+    ctrl.setTimeout(timeoutMS);
     return this;
   }
 

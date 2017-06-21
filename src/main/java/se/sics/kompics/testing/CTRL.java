@@ -84,6 +84,7 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   void addParticipant(Component c) {
+    checkInInitialHeader();
     participants.add(c);
   }
 
@@ -102,24 +103,11 @@ class CTRL<T extends ComponentDefinition> {
     currentBlock.drop(spec);
   }
 
-  <P extends PortType> void expectMessage(
-      KompicsEvent event, Port<P> port, Direction direction) {
-    EventSpec eventSpec = newEventSpec(event, port, direction);
-    registerSpec(eventSpec);
-  }
-
-  <P extends PortType, E extends KompicsEvent> void expectMessage(
-      Class<E> eventType, Predicate<E> predicate, Port<P> port, Direction direction) {
-    PredicateSpec predicateSpec = new PredicateSpec(eventType, predicate, port, direction);
-    registerSpec(predicateSpec);
-  }
-
-  <P extends PortType, E extends KompicsEvent> void expect(SingleEventSpec spec) {
+  void expect(SingleEventSpec spec) {
     registerSpec(spec);
   }
 
-  <P extends PortType, E extends KompicsEvent> void blockExpect(
-      SingleEventSpec spec) {
+  void blockExpect(SingleEventSpec spec) {
     assertMode(HEADER);
     currentBlock.expect(spec);
   }
@@ -209,10 +197,6 @@ class CTRL<T extends ComponentDefinition> {
 
   <E extends KompicsEvent, R extends KompicsEvent, P extends PortType> void trigger(
       Port<P> responsePort, Future<E, R> future) {
-/*    assertMode(EXPECT_FUTURE);
-
-    expectFuture.addTrigger(responsePort, future);*/
-
     assertBodyorConditionalMode();
     if (!futures.contains(future)) {
       throw new IllegalArgumentException("Future must be used in a previous method");
@@ -302,7 +286,7 @@ class CTRL<T extends ComponentDefinition> {
     table.addSpec(spec);
   }
 
-  <E extends KompicsEvent> void addComparator(
+  <E extends KompicsEvent> void setComparator(
       Class<E> eventType, Comparator<E> comparator) {
     checkInInitialHeader();
     comparators.put(eventType, comparator);
@@ -312,6 +296,14 @@ class CTRL<T extends ComponentDefinition> {
       Class<E> eventType, Function<E, Action> function) {
     checkInInitialHeader();
     table.setDefaultAction(eventType, function);
+  }
+
+  void setTimeout(long timeoutMS) {
+    checkInInitialHeader();
+    if (timeoutMS < 0) {
+      throw new IllegalStateException("Negative timeout");
+    }
+    eventQueue.setTimeout(timeoutMS);
   }
 
   void checkInInitialHeader() {

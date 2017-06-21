@@ -55,7 +55,6 @@ class OutBoundHandler extends ProxyHandler {
 
     if (event instanceof Direct.Request) {
       Direct.Request request = (Direct.Request) event;
-      //// TODO: 6/1/17 not public
       Unsafe.setOrigin(request, portStruct.getInboundPort().getPair());
     }
 

@@ -20,11 +20,14 @@
  */
 package se.sics.kompics.testing;
 
+import com.google.common.base.Function;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Positive;
+
+import java.util.Comparator;
 
 public class BuilderTest extends TestHelper{
 
@@ -35,7 +38,7 @@ public class BuilderTest extends TestHelper{
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
+    tc = TestContext.newInstance(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);
@@ -57,5 +60,40 @@ public class BuilderTest extends TestHelper{
         .expect(Ping.class, pingerPort, IN)
     ;
     assert tc.check();
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void connectOnlyAllowedInInitialHeader() {
+    assert !tc.body().connect(pingerPort, pongerPort).check();
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void createOnlyAllowedInInitialHeader() {
+    tc.body().create(Pinger.class);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void setDefaultActionOnlyAllowedInInitialHeader() {
+    tc.body().setDefaultAction(Ping.class, new Function<Ping, Action>() {
+      @Override
+      public Action apply(Ping ping) {
+        return Action.DROP;
+      }
+    });
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void setComparatorOnlyAllowedInInitialHeader() {
+    tc.body().setComparator(Ping.class, new Comparator<Ping>() {
+      @Override
+      public int compare(Ping p1, Ping p2) {
+        return 0;
+      }
+    });
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void setTimeoutOnlyAllowedInInitialHeader() {
+    tc.body().setTimeout(1000);
   }
 }

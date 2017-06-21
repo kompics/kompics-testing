@@ -39,7 +39,7 @@ import se.sics.kompics.testing.pingpong.PongComparator;
 import static se.sics.kompics.testing.Direction.*;
 
 public class ConditionalTest {
-  private TestContext<Pinger> tc = TestContext.newTestContext(Pinger.class, Init.NONE);
+  private TestContext<Pinger> tc = TestContext.newInstance(Pinger.class, Init.NONE);
   private Component ponger = tc.create(Ponger.class, Init.NONE);
   private Component pinger = tc.getComponentUnderTest();
   private Negative<PingPongPort> pingerPort = pinger.getNegative(PingPongPort.class);

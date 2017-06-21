@@ -57,7 +57,7 @@ public class DefaultActionTest extends TestHelper{
 
   @Before
   public void init() {
-    tc = TestContext.newTestContext(Pinger.class, new PingerInit(new Counter()));
+    tc = TestContext.newInstance(Pinger.class, new PingerInit(new Counter()));
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);

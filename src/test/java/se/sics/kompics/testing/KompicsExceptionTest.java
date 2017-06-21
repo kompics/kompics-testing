@@ -9,7 +9,7 @@ public class KompicsExceptionTest extends TestHelper{
 
   @Test
   public void throwsOnDirectNullOriginTest() {
-    TestContext<Ponger> tc = TestContext.newTestContext(Ponger.class);
+    TestContext<Ponger> tc = TestContext.newInstance(Ponger.class);
     Component ponger = tc.getComponentUnderTest(), pinger = tc.create(Pinger.class);
     Negative<PingPongPort> pingerPort = pinger.getNegative(PingPongPort.class);
     Positive<PingPongPort> pongerPort = ponger.getPositive(PingPongPort.class);

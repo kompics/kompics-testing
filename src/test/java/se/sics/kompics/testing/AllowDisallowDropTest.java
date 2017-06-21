@@ -41,7 +41,7 @@ public class AllowDisallowDropTest extends TestHelper{
   public void init() {
     pongsReceived = new Counter();
     PingerInit pingerInit = new PingerInit(pongsReceived);
-    tc = TestContext.newTestContext(Pinger.class, pingerInit);
+    tc = TestContext.newInstance(Pinger.class, pingerInit);
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, new PongerInit(new Counter()));
     pingerPort = pinger.getNegative(PingPongPort.class);

@@ -275,7 +275,6 @@ class NFA {
         for (Transition t : transitions) {
           nextStates.add(t.nextState);
         }
-        //return;
       }
     }
   }

@@ -76,7 +76,7 @@ public class DirectReqResTest extends TestHelper{
   }
 
   private void outReqInResSetup() {
-    tc = TestContext.newTestContext(Pinger.class, pingerInit);
+    tc = TestContext.newInstance(Pinger.class, pingerInit);
     pinger = tc.getComponentUnderTest();
     ponger = tc.create(Ponger.class, pongerInit);
     pingerPort = pinger.getNegative(PingPongPort.class);
@@ -119,7 +119,7 @@ public class DirectReqResTest extends TestHelper{
   }
 
   private void outResInReqSetup() {
-    tc = TestContext.newTestContext(Ponger.class, pongerInit);
+    tc = TestContext.newInstance(Ponger.class, pongerInit);
     ponger = tc.getComponentUnderTest();
     pinger = tc.create(Pinger.class, pingerInit);
     pingerPort = pinger.getNegative(PingPongPort.class);
