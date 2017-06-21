@@ -53,8 +53,6 @@ class Block {
   private Multiset<SingleEventSpec> pending = HashMultiset.create();
   private Multiset<SingleEventSpec> received = HashMultiset.create();
 
-  enum MODE { HEADER, BODY, UNORDERED, ANSWER_REQUEST, CONDITIONAL}
-
   Block(Block previousBlock, int count, BlockInit blockInit) {
     this(previousBlock, count);
     this.blockInit = blockInit;
@@ -162,16 +160,6 @@ class Block {
   }
 
   boolean handle(EventSpec receivedSpec) {
-/*    Iterator<SingleEventSpec> it = pending.iterator();
-    while (it.hasNext()) {
-      SingleEventSpec spec = it.next();
-      if (spec.match(receivedSpec)) {
-        it.remove();
-        TestContext.logger.trace("Event {} matched by {}", receivedSpec, status());
-        return true;
-      }
-    }
-    return previousBlock != null && previousBlock.handle(receivedSpec);*/
     int remaining = pending.count(receivedSpec);
     if (remaining == 0) {
       return previousBlock != null && previousBlock.handle(receivedSpec);

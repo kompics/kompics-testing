@@ -363,9 +363,9 @@ public class ConditionalTest {
         .answerRequest(Ping.class, pingerPort, future1)
         .answerRequest(Ping.class, pingerPort, future2)
         .answerRequest(Ping.class, pingerPort, future3)
-        .trigger(pingerPort, future2)
-        .trigger(pingerPort, future1)
-        .trigger(pingerPort, future3)
+        .trigger(future2, pingerPort)
+        .trigger(future1, pingerPort)
+        .trigger(future3, pingerPort)
 
         .expect(ping(7), pingerPort, OUT)
     .end();

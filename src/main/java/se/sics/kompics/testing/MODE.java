@@ -20,10 +20,9 @@
  */
 package se.sics.kompics.testing;
 
-public abstract class BlockInit {
-
-  /**
-   * This method is called at the beginning of every iteration of a block.
-   */
-  public abstract void init();
+/**
+ * Possible modes.
+ */
+enum MODE {
+  HEADER, BODY, UNORDERED, ANSWER_REQUEST, CONDITIONAL
 }

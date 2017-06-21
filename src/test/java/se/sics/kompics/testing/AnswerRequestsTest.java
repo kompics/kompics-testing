@@ -266,11 +266,11 @@ public class AnswerRequestsTest extends TestHelper{
             .answerRequest(Ping.class, pingerPort, future1)
             .answerRequest(Ping.class, pingerPort, future2)
 
-            .trigger(pingerPort, future2)
+            .trigger(future2, pingerPort)
             .answerRequest(Ping.class, pingerPort, future3)
 
-            .trigger(pingerPort, future1)
-            .trigger(pingerPort, future3)
+            .trigger(future1, pingerPort)
+            .trigger(future3, pingerPort)
 
         .end()
     ;
@@ -294,9 +294,9 @@ public class AnswerRequestsTest extends TestHelper{
                 .answerRequest(Ping.class, pingerPort, future2)
             .end()
 
-            .trigger(pingerPort, future2)
-            .trigger(pingerPort, future1)
-            .trigger(pingerPort, future3)
+            .trigger(future2, pingerPort)
+            .trigger(future1, pingerPort)
+            .trigger(future3, pingerPort)
         .end()
     ;
     assert tc.check();
@@ -331,8 +331,8 @@ public class AnswerRequestsTest extends TestHelper{
             .answerRequest(Ping.class, pingerPort, future3)
         .end()
 
-        .trigger(pingerPort, future2)
-        .trigger(pingerPort, future1)
+        .trigger(future2, pingerPort)
+        .trigger(future1, pingerPort)
     ;
 
     assert !tc.check();

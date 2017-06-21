@@ -45,8 +45,7 @@ import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
 
-import static se.sics.kompics.testing.Block.MODE;
-import static se.sics.kompics.testing.Block.MODE.*;
+import static se.sics.kompics.testing.MODE.*;
 import static se.sics.kompics.testing.Block.STAR;
 
 class CTRL<T extends ComponentDefinition> {
@@ -158,14 +157,14 @@ class CTRL<T extends ComponentDefinition> {
   }
 
   void answerRequests() {
-    assertMode(BODY);
-    setMode(ANSWER_REQUEST);
+    assertBodyorConditionalMode();
+    pushNewMode(ANSWER_REQUEST);
     requestSequence = new ArrayList<AnswerRequestSpec>();
     balancedEnd++;
   }
 
   private void endAnswerRequestMode() {
-    setMode(BODY);
+    currentMode = previousMode.pop();
     if (!requestSequence.isEmpty()) {
       requestSequence.get(requestSequence.size() - 1).isFinalRequest = true;
     }
