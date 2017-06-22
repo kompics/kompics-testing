@@ -20,7 +20,7 @@
  */
 package se.sics.kompics.testing;
 
-public abstract class BlockInit {
+public interface BlockInit {
 
   /**
    * This method is called at the beginning of every iteration of a block.
