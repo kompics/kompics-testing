@@ -22,21 +22,21 @@ package se.sics.kompics.testing;
 
 import se.sics.kompics.KompicsEvent;
 
-public abstract class Future<E extends KompicsEvent, R extends KompicsEvent> {
+public abstract class Future<RQ extends KompicsEvent, RS extends KompicsEvent> {
 
   /**
    * Sets the future instance if the specified request is matched.
    * @param request request event.
    * @return true iff request was matched.
    */
-  public abstract boolean set(E request);
+  public abstract boolean set(RQ request);
 
   /**
    * Returns a response event if future instance has previously been successfully set via call to {@link #set(KompicsEvent)}.
    * Otherwise null should be returned.
    * @return  response event
    */
-  public abstract R get();
+  public abstract RS get();
 
   @Override
   public final int hashCode() {

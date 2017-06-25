@@ -60,6 +60,11 @@ public class TestContext<T extends ComponentDefinition> {
 
   static final Logger logger = LoggerFactory.getLogger("KompicsTesting");
 
+  /**
+   * Timeout value in milliseconds - Default 400ms
+   */
+  public static final long timeout = 400;
+
   // constructor
   private TestContext(Init<? extends ComponentDefinition> initEvent, Class<T> definition) {
     proxy = new Proxy<T>();
@@ -121,7 +126,7 @@ public class TestContext<T extends ComponentDefinition> {
   // create
 
   /**
-   * Creates a new component as a dependency.
+   * Create a new component as a dependency.
    *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param componentDefinition {@link ComponentDefinition} class of dependency.
    * @param init                {@link Init} to instantiate componentDefinition
@@ -144,8 +149,8 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Creates a new component as a dependency.
-   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
+   * Create a new component as a dependency.
+   * <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param componentDefinition {@link ComponentDefinition} class of dependency.
    * @param init                {@link Init} to instantiate componentDefinition
    * @param <T>                 {@link ComponentDefinition} type
@@ -187,10 +192,10 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Connects two ports with the specified {@link ChannelFactory}.
-   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
+   * <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param negative  {@link Negative} port.
    * @param positive  {@link Positive} port.
-   * @param factory   {@link ChannelFactory} to connect both ports.
+   * @param factory   {@link ChannelFactory} to connect ports.
    * @param <P>       {@link PortType}.
    * @return          current {@link TestContext}.
    */
@@ -217,7 +222,7 @@ public class TestContext<T extends ComponentDefinition> {
   /**
    * Enters {@link MODE#HEADER HEADER} mode and begins creating a block.
    * The block matches a sequence the specified number of times.
-   *  <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param times  number of times to match a sequence.
    * @return current {@link TestContext}.
    */
@@ -229,7 +234,7 @@ public class TestContext<T extends ComponentDefinition> {
   /**
    * Enters {@link MODE#HEADER HEADER} mode and begins creating a block.
    * The block matches a sequence zero or more times.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @return current {@link TestContext}.
    */
   public TestContext<T> repeat() {
@@ -240,8 +245,8 @@ public class TestContext<T extends ComponentDefinition> {
   /**
    * Enters {@link MODE#HEADER HEADER} mode and begins creating a block.
    * The block matches a sequence the specified number of times.
-   * The entryFunction is executed at the beginning of every iteration of the block - e.g If times = 5, then it is run 5 times.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * The entryFunction is executed at the beginning of every iteration of the block.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param times number of times to match a sequence.
    * @param entryFunction {@link EntryFunction} implementation to be called at the beginning of each iteration of the created block.
    * @return current {@link TestContext}.
@@ -257,8 +262,7 @@ public class TestContext<T extends ComponentDefinition> {
    * The block matches a sequence zero or more times.
    * The entryFunction is executed at the beginning of every iteration of the block -
    * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
-   * e.g If the block matches 5 sequences, then it is run 5 times.
-   * @param entryFunction {@link EntryFunction} implementation to be called at the beginning of each iteration of the created block.
+   * @param entryFunction {@link EntryFunction} instance
    * @return current {@link TestContext}.
    */
   public TestContext<T> repeat(EntryFunction entryFunction) {
@@ -270,8 +274,8 @@ public class TestContext<T extends ComponentDefinition> {
   // body
 
   /**
-   * Begins the body of a block.
-   * <p>Allowed modes - {@link MODE#HEADER HEADER}.</p>
+   * Begin the body of a block.
+   * <p>Modes - {@link MODE#HEADER HEADER}.</p>
    * @return current {@link TestContext}.
    */
   public TestContext<T> body() {
@@ -282,9 +286,9 @@ public class TestContext<T extends ComponentDefinition> {
   // end
 
   /**
-   * Marks the end of a a {@link #repeat()}, {@link #either()}, {@link #unordered()}, {@link #answerRequests()}.
-   * Exits the current mode.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED},
+   * Mark the end of a a {@link #repeat()}, {@link #either()}, {@link #unordered()}, {@link #answerRequests()}.
+   * Exits the current mode and restores the previous one.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED},
    * {@link MODE#ANSWER_REQUEST ANSWER_REQUEST}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @return current {@link TestContext}.
    */
@@ -296,10 +300,10 @@ public class TestContext<T extends ComponentDefinition> {
   // expect
 
   /**
-   * Matches the occurrence of a single event going in or out of the component under test.
+   * Match the occurrence of a single event going in or out of the component under test.
    * Event equivalence is determined using a comparator provided via method {@link #setComparator(Class, Comparator)},
    * otherwise it defaults to the {@link Object#equals(Object)} method of event.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param event       Event message to be matched.
    * @param port        Port on which event should occur.
    * @param direction   Direction IN or OUT of expected event.
@@ -315,10 +319,9 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Matches the occurrence of a single event going in or out of the component under test.
-   * The specified predicate is used to determine whether or not the expected message matches and
-   * should return true only in that case.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * Match the occurrence of a single event going in or out of the component under test.
+   * The predicate returns true iff a specified event argument is expected.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param eventType   Class of expected event.
    * @param predicate   predicate that determines a matched event message.
    * @param port        port on which event should occur.
@@ -336,8 +339,8 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Matches the occurrence of a single event of the specified class, going in or out of the component under test.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * Match the occurrence of a single event of the specified class, going in or out of the component under test.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#UNORDERED UNORDERED}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param eventType   Class of expected event.
    * @param port        port on which event should occur.
    * @param direction   Direction IN or OUT of expected event.
@@ -356,8 +359,8 @@ public class TestContext<T extends ComponentDefinition> {
   // trigger
 
   /**
-   * Triggers an event on the specified port.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * Trigger an event on the specified port.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param event    event to be triggered.
    * @param port     port on which to trigger event.
    * @param <P>      port type.
@@ -371,10 +374,10 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Triggers an event provided by future, as a response on specified port.
-   * The future must have been set in a previous call to {@link #answerRequest(Class, Port, Future)}.
+   * Trigger the event provided by future as a response on specified port.
+   * The future must have been {@link Future#set(KompicsEvent) set}in a previous call to {@link #answerRequest(Class, Port, Future)}.
    * The {@link Future#get()} method is called to retrieve the triggered event.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param responsePort   port on which event is triggered.
    * @param future         future providing event to be triggered.
    * @param <RQ>           request event type.
@@ -408,10 +411,14 @@ public class TestContext<T extends ComponentDefinition> {
    * <li>{@link #expect(Class, Predicate, Port, Direction)}</li>
    * <li>{@link #answerRequest(Class, Port, Future)}</li>
    * <li>{@link #answerRequest(Class, Port, Function, Port)}</li>
-   * <p>Expected events here are matched in the order that they occur at runtime.
-   * When answering requests in this mode, the immediateResponse toggles whether or not
-   * to trigger response events on provided port once a request is matched.</p>
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>
+   * Match events in the order that they occur at runtime as opposed to their sequential specified order.
+   * When answering requests in this mode, setting immediateResponse to true causes
+   * each response event to be triggered as soon the request is matched, otherwise it is
+   * triggered when all requests have been matched.
+   * The immediateResponse flag has no effect when using {@link #answerRequest(Class, Port, Future)}.
+   * </p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param immediateResponse - where applicable, respond to requests immediately(true) or when all events have been received(false).
    * @return   current {@link TestContext}.
    */
@@ -424,8 +431,8 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Match the occurrence of the specified event at any position within the sequence of the current block.
-   * If the specified event does not occur after executing the last statement of the block, the test case fails.
-   * <p>Allowed modes - {@link MODE#HEADER HEADER}.</p>
+   * If the specified event does not occur after executing the last statement of the block, the test case fails on timeout.
+   * <p>Modes - {@link MODE#HEADER HEADER}.</p>
    * @param event       expected event to match
    * @param port        port on which event should occur.
    * @param direction   Direction IN or OUT.
@@ -442,7 +449,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    *  Similar to {@link #blockExpect(KompicsEvent, Port, Direction)}.
-   *  Instead it matches the expected event with the specified predicate.
+   *  Matches the expected event with the specified predicate.
    */
   public <P extends  PortType, E extends KompicsEvent> TestContext<T> blockExpect(
           Class<E> eventType, Predicate<E> pred, Port<P> port, Direction direction) {
@@ -454,7 +461,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    *  Similar to {@link #blockExpect(KompicsEvent, Port, Direction)}.
-   *  Instead an event of the specified class is matched.
+   *  Event of the specified class is matched.
    */
   public <P extends  PortType, E extends KompicsEvent> TestContext<T> blockExpect(
       Class<E> eventType, Port<P> port, Direction direction) {
@@ -479,13 +486,16 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Tries to match an outgoing message on the specified requestPort as a request message by calling the provided
+   * Match an outgoing message on the specified requestPort as a request message by calling the provided
    * mapper function with it as an argument.
    * If mapper returns null, then the match fails otherwise the returned message is treated as a response and triggered
    * on responsePort.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}, {@link MODE#ANSWER_REQUEST ANSWER_REQUEST}.</p>
-   * <p>If used in {@link MODE#ANSWER_REQUEST [ANSWER_REQUEST]} mode then the
-   * responses are triggered only when all requests have been matched. Otherwise responses are triggered immediately.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}, {@link MODE#UNORDERED UNORDERED},
+   * {@link MODE#ANSWER_REQUEST ANSWER_REQUEST}.</p>
+   * <p>If used in {@link MODE#ANSWER_REQUEST ANSWER_REQUEST} mode then the
+   * responses are triggered only when all requests have been matched.
+   * If in {@link MODE#UNORDERED UNORDERED} this can be {@link #unordered(boolean) configured}.
+   * Otherwise responses are triggered immediately.</p>
    * @param requestType    events of this class are treated as requests.
    * @param requestPort    port on which to expect request events.
    * @param mapper         mapper function from a matched request message to a response message otherwise null.
@@ -504,11 +514,13 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Tries to match an outgoing message M on the specified requestPort as a request message by calling the provided
-   * {@link Future#set(KompicsEvent)} method of future with M as an argument.
-   * If future returns true, then the match succeeded and a response should have been generated and set by the future.
+   * Match an outgoing message on the specified requestPort as a request message by calling the provided
+   * {@link Future#set(KompicsEvent)} method of future with an observed event as an argument.
+   * If future returns true, then the match succeeded and a response should have been generated such that
+   * a subsequent call to {@link Future#get()} returns it instead of null.
    * This response can later be used in a call to {@link #trigger(Future, Port)}.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}, {@link MODE#ANSWER_REQUEST ANSWER_REQUEST}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}, {@link MODE#UNORDERED UNORDERED},
+   * {@link MODE#ANSWER_REQUEST ANSWER_REQUEST}.</p>
    * @param requestType    events of this class are treated as requests.
    * @param requestPort    port on which to expect request events.
    * @param future         future to match a request and set a response.
@@ -527,14 +539,14 @@ public class TestContext<T extends ComponentDefinition> {
   // either-or
 
   /**
-   * Enters a new {@link MODE#CONDITIONAL CONDITIONAL} mode, creating a new conditional statement.
-   * A conditional statement consists of <code>either() A or() B end()</code> of
-   * which only one of sequences A or B is matched at runtime depending on the events that actually occur.
-   * Conditional statements can be nested using more calls to this statement
+   * Enters a {@link MODE#CONDITIONAL CONDITIONAL} mode, and begins creating a new conditional.
+   * A conditional consists of <code>either() A or() B end()</code> of
+   * which only one of sequences of statements A or B is executed at runtime depending on the observed events.
+   * Conditionals can be nested.
    * e.g <code>either() A either() C or() D end() or() B end()</code> is similar to
    * the regular expression A(C|D)|B while
    * <code>either() A or either() C or() D end () B end()</code> is similar to A | (C|D)B.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @return  current {@link TestContext}.
    */
   public TestContext<T> either() {
@@ -543,9 +555,9 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Begins the 'or' sequence of a {@link #either() [conditional statment]}.
+   * Begins the 'or' sequence of a {@link #either() conditional statment}.
    * Must be called exactly once for the current conditional statement.
-   * <p>Allowed modes - {@link MODE#CONDITIONAL [CONDITIONAL]}.</p>
+   * <p>Modes - {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @return  current {@link TestContext}.
    */
   public TestContext<T> or() {
@@ -556,9 +568,9 @@ public class TestContext<T extends ComponentDefinition> {
   // allow disallow drop
 
   /**
-   * Blacklists the specified event within the current repeat block.
+   * Blacklist the specified event within the current block.
    * This means that if an event matching the specified one occurs at any position within the block then the test case fails.
-   * <p>Allowed modes - {@link MODE#HEADER HEADER}.</p>
+   * <p>Modes - {@link MODE#HEADER HEADER}.</p>
    * @param event      event to be matched against.
    * @param port       port on which the matched event should occur.
    * @param direction  Direction IN or OUT of the event.
@@ -600,10 +612,10 @@ public class TestContext<T extends ComponentDefinition> {
 
   // allow
   /**
-   * Whitelists the specified event within the current repeat block.
+   * Whitelist the specified event within the current block.
    * This means that if an event matching the specified one occurs at any position within the block then
    * that event is handled normally. However such events are not necessary for a successful testcase.
-   * <p>Allowed modes - {@link MODE#HEADER HEADER}.</p>
+   * <p>Modes - {@link MODE#HEADER HEADER}.</p>
    * @param event      event to be matched against.
    * @param port       port on which the matched event should occur.
    * @param direction  Direction IN or OUT of the event.
@@ -644,10 +656,10 @@ public class TestContext<T extends ComponentDefinition> {
 
   // drop
   /**
-   * Drops the specified event within the current repeat block.
+   * Drops the specified event within the current block.
    * This means that if an event matching the specified one occurs at any position within the block then
    * that message of that event is not forwarded to the recipient(s).
-   * <p>Allowed modes - {@link MODE#HEADER HEADER}.</p>
+   * <p>Modes - {@link MODE#HEADER HEADER}.</p>
    * @param event      event to be matched against.
    * @param port       port on which the matched event should occur.
    * @param direction  Direction IN or OUT of the event.
@@ -687,10 +699,10 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Sets a comparator for events of class eventType.
-   * The comparator is used for determining the equivalence of two messages of the specified eventType.
-   * If no comparator is provided for a class, then the {@link Object#equals(Object)} is used.
-   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
+   * Set a comparator for comparing events of the specified class.
+   * The comparator is used for determining the equivalence of two messages of the same class.
+   * If no comparator is provided for that class, then the {@link Object#equals(Object)} of that class is used.
+   * <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param eventType   class of event.
    * @param comparator  comparator for eventType.
    * @param <E>         eventType.
@@ -705,11 +717,11 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Set policy for handling unmatched/unexpected/unspecified events.
-   * If such an event M of type eventType is observed, then function is called with M as an argument.
+   * If such an event of class eventType is observed, then function is called with it as an argument.
    * If the return value of function is <code>null</code> then the test case fails.
    * Otherwise, an {@link Action} is returned determining whether to drop, whitelist or blacklist M.
-   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
-   * @param eventType  classes and subclasses of events to handle with function.
+   * <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
+   * @param eventType  classes (and subclasses) of events to handle with function.
    * @param function   function to specify the taken action for an event.
    * @param <E>        eventType.
    * @return           current {@link TestContext}.
@@ -723,7 +735,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Returns the created component under test.
-   * <p>Allowed modes - All modes.</p>
+   * <p>Modes - All.</p>
    * @return  component under test.
    */
   public Component getComponentUnderTest() {
@@ -733,10 +745,11 @@ public class TestContext<T extends ComponentDefinition> {
   // inspect
 
   /**
-   * Specifies a predicate to be called by the framework with the {@link ComponentDefinition} as an argument.
-   * If the predicate returns false, the test case fails immediately. Otherwise the test case continues.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
-   * @param predicate predicate to be called by framework.
+   * Inspect the internal state of a component.
+   * predicate is called by the framework with the {@link ComponentDefinition} as an argument.
+   * If the predicate returns false, the test case fails immediately.
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * @param predicate inspect predicate
    * @return current {@link TestContext}.
    */
   public TestContext<T> inspect(Predicate<T> predicate) {
@@ -748,9 +761,9 @@ public class TestContext<T extends ComponentDefinition> {
   // expectFault
 
   /**
-   * Verifies that an exception is thrown at the current position in the sequence.
+   * Verifies that an exception is thrown at the current position in execution.
    * If no exception is thrown the test case fails.
-   * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+   * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param exceptionType  class (or superclass) of expected exception
    * @return current {@link TestContext}.
    */
@@ -775,8 +788,8 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Specify timeout value waiting for an event to occur.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   * Specify timeout value to wait for an event to occur.
+   * <p>Modes - first (initial) {@link MODE#HEADER HEADER}.</p>
    * @param timeoutMS  timeout in milliseconds
    * @return current {@link TestContext}.
    */
@@ -786,7 +799,7 @@ public class TestContext<T extends ComponentDefinition> {
   }
 
   /**
-   * Runs the specified testcase
+   * Run the specified testcase
    * @return true if observed event sequence conforms to testcase otherwise false.
    *  <p>Allowed modes - {@link MODE#BODY BODY}.</p>
    */

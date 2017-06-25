@@ -308,7 +308,7 @@ class CTRL<T extends ComponentDefinition> {
   void checkInInitialHeader() {
     assertMode(HEADER);
     if (currentBlock.previousBlock != null) {
-      throw new IllegalStateException("Operation only supported in initial header");
+      throw new IllegalStateException("Operation only supported in setup header");
     }
   }
 
