@@ -25,7 +25,6 @@ import com.google.common.collect.Multiset;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -39,7 +38,7 @@ class Block {
 
   private boolean isKleeneBlock;
 
-  private BlockInit blockInit;
+  private EntryFunction entryFunction;
   final Block previousBlock;
 
   private boolean currentlyExecuting;
@@ -53,9 +52,9 @@ class Block {
   private Multiset<SingleEventSpec> pending = HashMultiset.create();
   private Multiset<SingleEventSpec> received = HashMultiset.create();
 
-  Block(Block previousBlock, int count, BlockInit blockInit) {
+  Block(Block previousBlock, int count, EntryFunction entryFunction) {
     this(previousBlock, count);
-    this.blockInit = blockInit;
+    this.entryFunction = entryFunction;
   }
 
   Block() {
@@ -90,8 +89,8 @@ class Block {
       currentCount = times;
     }
 
-    if (blockInit != null) {
-      blockInit.init();
+    if (entryFunction != null) {
+      entryFunction.run();
     }
 
     currentlyExecuting = true;

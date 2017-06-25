@@ -122,7 +122,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Creates a new component as a dependency.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param componentDefinition {@link ComponentDefinition} class of dependency.
    * @param init                {@link Init} to instantiate componentDefinition
    * @param <T>                 {@link ComponentDefinition} type
@@ -145,7 +145,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Creates a new component as a dependency.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param componentDefinition {@link ComponentDefinition} class of dependency.
    * @param init                {@link Init} to instantiate componentDefinition
    * @param <T>                 {@link ComponentDefinition} type
@@ -187,7 +187,7 @@ public class TestContext<T extends ComponentDefinition> {
 
   /**
    * Connects two ports with the specified {@link ChannelFactory}.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param negative  {@link Negative} port.
    * @param positive  {@link Positive} port.
    * @param factory   {@link ChannelFactory} to connect both ports.
@@ -240,30 +240,30 @@ public class TestContext<T extends ComponentDefinition> {
   /**
    * Enters {@link MODE#HEADER HEADER} mode and begins creating a block.
    * The block matches a sequence the specified number of times.
-   * The blockInit is executed at the beginning of every iteration of the block - e.g If times = 5, then blockInit is run 5 times.
+   * The entryFunction is executed at the beginning of every iteration of the block - e.g If times = 5, then it is run 5 times.
    * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
    * @param times number of times to match a sequence.
-   * @param blockInit {@link BlockInit} implementation to be called at the beginning of each iteration of the created block.
+   * @param entryFunction {@link EntryFunction} implementation to be called at the beginning of each iteration of the created block.
    * @return current {@link TestContext}.
    */
-  public TestContext<T> repeat(int times, BlockInit blockInit) {
-    checkNotNull(blockInit);
-    ctrl.repeat(times, blockInit);
+  public TestContext<T> repeat(int times, EntryFunction entryFunction) {
+    checkNotNull(entryFunction);
+    ctrl.repeat(times, entryFunction);
     return this;
   }
 
   /**
    * Enters {@link MODE#HEADER HEADER} mode and begins creating a block.
    * The block matches a sequence zero or more times.
-   * The blockInit is executed at the beginning of every iteration of the block -
+   * The entryFunction is executed at the beginning of every iteration of the block -
    * <p>Allowed modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
-   * e.g If the block matches 5 sequences, then blockInit is run 5 times.
-   * @param blockInit {@link BlockInit} implementation to be called at the beginning of each iteration of the created block.
+   * e.g If the block matches 5 sequences, then it is run 5 times.
+   * @param entryFunction {@link EntryFunction} implementation to be called at the beginning of each iteration of the created block.
    * @return current {@link TestContext}.
    */
-  public TestContext<T> repeat(BlockInit blockInit) {
-    checkNotNull(blockInit);
-    ctrl.repeat(blockInit);
+  public TestContext<T> repeat(EntryFunction entryFunction) {
+    checkNotNull(entryFunction);
+    ctrl.repeat(entryFunction);
     return this;
   }
 
@@ -690,7 +690,7 @@ public class TestContext<T extends ComponentDefinition> {
    * Sets a comparator for events of class eventType.
    * The comparator is used for determining the equivalence of two messages of the specified eventType.
    * If no comparator is provided for a class, then the {@link Object#equals(Object)} is used.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param eventType   class of event.
    * @param comparator  comparator for eventType.
    * @param <E>         eventType.
@@ -708,7 +708,7 @@ public class TestContext<T extends ComponentDefinition> {
    * If such an event M of type eventType is observed, then function is called with M as an argument.
    * If the return value of function is <code>null</code> then the test case fails.
    * Otherwise, an {@link Action} is returned determining whether to drop, whitelist or blacklist M.
-   *  <p>Allowed modes - first (initial) {@link MODE#HEADER HEADER}.</p>
+   *  <p>Modes - setup {@link MODE#HEADER HEADER}.</p>
    * @param eventType  classes and subclasses of events to handle with function.
    * @param function   function to specify the taken action for an event.
    * @param <E>        eventType.

@@ -20,10 +20,10 @@
  */
 package se.sics.kompics.testing;
 
-public interface BlockInit {
+public interface EntryFunction {
 
   /**
-   * This method is called at the beginning of every iteration of a block.
+   * called on entry to a block.
    */
-  public abstract void init();
+  public abstract void run();
 }

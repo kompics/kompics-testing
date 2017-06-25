@@ -92,9 +92,9 @@ public class DirectReqResTest extends TestHelper{
     Unsafe.setOrigin(reqB, pingerPort);
 
     // reset origin for ping used in loop otherwise, multiple ghost ports are created
-    BlockInit resetOrigin = new BlockInit() {
+    EntryFunction resetOrigin = new EntryFunction() {
       @Override
-      public void init() {
+      public void run() {
         Unsafe.setOrigin(reqA, pingerPort);
       }
     };

@@ -21,7 +21,7 @@
 package se.sics.kompics.testing;
 
 /**
- * Possible modes.
+ * Modes.
  */
 enum MODE {
   HEADER, BODY, UNORDERED, ANSWER_REQUEST, CONDITIONAL

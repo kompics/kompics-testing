@@ -92,9 +92,9 @@ public class RepeatTest extends TestHelper{
   @Test
   public void initTest() {
     final Counter counter = new Counter();
-    BlockInit init = new BlockInit() {
+    EntryFunction init = new EntryFunction() {
       @Override
-      public void init() {
+      public void run() {
         counter.count++;
       }
     };

@@ -53,15 +53,15 @@ public class PingerPongerTest {
 
   private Counter counter = new Counter();
 
-  private BlockInit increment = new BlockInit() {
+  private EntryFunction increment = new EntryFunction() {
     @Override
-    public void init() {
+    public void run() {
       counter.i++;
     }
   };
 
   @Test
-  public void blockInitTest() {
+  public void entryFunctionTest() {
     int M = 5, N = 2;
     tc.connect(pingerPort, pongerPort).body()
         .repeat(M)
@@ -79,7 +79,7 @@ public class PingerPongerTest {
   }
 
   @Test
-  public void blockInitNestedTest() {
+  public void entryFunctionNestedTest() {
 
     int M = 2, N = 1;
     tc.connect(pingerPort, pongerPort).body()
@@ -100,7 +100,7 @@ public class PingerPongerTest {
   }
 
   @Test
-  public void nestedblockAndIterationInitsTest() {
+  public void nestedEntryFunctionsTest() {
     int A = 3, B = 4, C = 5, D = 6, E = 7;
     tc.body()
         .repeat(A, increment) // A

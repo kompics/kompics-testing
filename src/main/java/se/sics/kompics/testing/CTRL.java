@@ -240,12 +240,12 @@ class CTRL<T extends ComponentDefinition> {
     enterNewBlock(STAR, block);
   }
 
-  void repeat(int count, BlockInit init) {
+  void repeat(int count, EntryFunction init) {
     Block block = new Block(currentBlock, count, init);
     enterNewBlock(count, block);
   }
 
-  void repeat(BlockInit init) {
+  void repeat(EntryFunction init) {
     Block block = new Block(currentBlock, STAR, init);
     enterNewBlock(STAR, block);
   }

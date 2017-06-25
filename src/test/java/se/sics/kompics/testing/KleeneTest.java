@@ -31,9 +31,9 @@ import static org.junit.Assert.assertEquals;
 public class KleeneTest extends TestHelper{
 
   private final Counter counter = new Counter();
-  private BlockInit increment = new BlockInit() {
+  private EntryFunction increment = new EntryFunction() {
     @Override
-    public void init() {
+    public void run() {
       counter.count++;
     }
   };

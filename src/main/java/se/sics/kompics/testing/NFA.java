@@ -641,7 +641,7 @@ class NFA {
       }
 
       if (isStartOfLoop() && !t.isEmpty()) {
-        runBlockInits();
+        runEntryFunctions();
       }
 
       return t;
@@ -664,7 +664,7 @@ class NFA {
     Collection<Transition> doInternalEventTransition() {
       // if start state is interaction etc (run block init before performing event)
       if (isStartOfLoop()) {
-        runBlockInits();
+        runEntryFunctions();
       }
 
       // trigger, inspect, etc
@@ -686,7 +686,7 @@ class NFA {
       return internalEventSpec != null;
     }
 
-    private void runBlockInits() {
+    private void runEntryFunctions() {
       boolean canRunInit = false; // parent block is closed -> nested blocks are closed
       for (Block parent : parentBlocks) {
         if (canRunInit) {
