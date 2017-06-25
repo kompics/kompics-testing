@@ -154,11 +154,11 @@ class NFA {
     finalFA.startState.isFinalState = true;
     repeatMain.build(finalFA);
     currentStates = new HashSet<State>(repeatMain.startState.eclosure());
-    logger.debug("start state is {}", currentStates);
+    logger.trace("start state is {}", currentStates);
     for (State s : currentStates) {
-      logger.debug("{}", s.show());
+      logger.trace("      {}", s.show());
     }
-    logger.debug("final state is {}", finalFA.startState);
+    logger.trace("final state is {}", finalFA.startState);
   }
 
   boolean isInFinalState() {
@@ -175,9 +175,18 @@ class NFA {
   }
 
   boolean doTransition(EventSpec receivedSpec) {
-    logger.debug("{}: received event {}", currentStates, receivedSpec);
+    if (receivedSpec != null) {
+      logger.info("{}: observed event [{}]",
+          logger.isDebugEnabled()? currentStates : "", receivedSpec);
+    } else {
+      logger.trace("{}: observed null", currentStates);
+    }
     while (true) {
       tryInternalEventTransitions();
+
+      if (inErrorState()) {
+        return false;
+      }
 
       Set<State> nextStates = new HashSet<State>();
       if (receivedSpec != null) {
@@ -191,7 +200,7 @@ class NFA {
         // if found kill those that aren't and retry handle received spec
         forceInternalEventTransitions(nextStates);
         if (!nextStates.isEmpty()) {
-          logger.debug("internal transition(s) found");
+          logger.trace("internal transition(s) found");
           updateCurrentState(nextStates);
 
           if (receivedSpec == null) { // retry event queue
@@ -201,23 +210,23 @@ class NFA {
           }
         }
 
-        logger.debug("No internal transition(s) found");
+        logger.trace("No internal transition(s) found");
       }
 
       if (receivedSpec == null) {
-        logger.debug("No event was received");
+        logger.info("No event was received");
         return false;
       }
 
       // try registered default actions
-      logger.debug("trying default actions");
+      logger.trace("trying default actions");
       boolean handleByDefault = tryDefaultActions(receivedSpec);
       if (handleByDefault) {
         return !inErrorState();
       }
 
-      logger.error("No transitions found for {}", receivedSpec);
-      logger.debug("Last state was {}", currentStates);
+      logger.error("Event {} was not matched", receivedSpec);
+      showCurrentStates();
       return false;
     }
   }
@@ -257,7 +266,7 @@ class NFA {
     //logger.debug("default action {}", action);
     switch (action) {
       case FAIL:
-        logger.debug("{}: Received unwanted event {}", currentStates, receivedSpec);
+        logger.error("{}: Observed unmatched event {}", currentStates, receivedSpec);
         return false;
       case HANDLE:
         receivedSpec.handle();
@@ -285,7 +294,7 @@ class NFA {
       // if some thread in the NFA expects an event, do nothing
       for (State state : currentStates) {
         if (!state.canPerformInternalTransition()) {
-          //logger.debug("state {} has no internal event. returning", state);
+          //logger.trace("state {} has no internal event. returning", state);
           return;
         }
       }
@@ -295,7 +304,7 @@ class NFA {
       // if so, non-singular set currentStates implies an ambiguous test specification
       Set<State> nextStates = new HashSet<State>();
       for (State state : currentStates) {
-        //logger.debug("{} performing internal transition", state);
+        //logger.trace("{} performing internal transition", state);
         Collection<Transition> transitions = state.doInternalEventTransition();
         assert !transitions.isEmpty();
         for (Transition t : transitions) {
@@ -303,13 +312,12 @@ class NFA {
         }
       }
       assert !nextStates.isEmpty();
-      //logger.debug("all states have internal transitions");
       updateCurrentState(nextStates);
     }
   }
 
   private void updateCurrentState(Set<State> nextStates) {
-    logger.debug("{}: new state is {}", currentStates, nextStates);
+    logger.trace("{}: new state is {}", currentStates, nextStates);
 
     // recompute active blocks
     activeBlocks.clear();
@@ -327,7 +335,7 @@ class NFA {
 
     for (State state : currentStates) {
       if (!nextStates.contains(state) && !activeBlocks.contains(state.block)) {
-        logger.debug("reseting {}, for state {}", state.block, state);
+        //logger.trace("reseting {}, for state {}", state.block, state);
         state.block.reset();
       }
     }
@@ -339,6 +347,16 @@ class NFA {
       currentStates.addAll(state.eclosure());
     }
   }
+
+  private void showCurrentStates() {
+    logger.trace("========================");
+    logger.trace("Current States: {}", currentStates);
+    for (State s : currentStates){
+      logger.trace("    {}: {}", s, s.show());
+    }
+    logger.trace("========================");
+  }
+
 
   /**
    *
@@ -634,7 +652,7 @@ class NFA {
 
       // allow, disallow, drop transitions
       if (t.isEmpty()) {
-        Transition blockTransition = handleWithBlockTransitions(receivedSpec);
+        Transition blockTransition = handleWithBlockHeaders(receivedSpec);
         if (blockTransition != null) {
           t.add(blockTransition);
         }
@@ -647,15 +665,17 @@ class NFA {
       return t;
     }
 
-    private Transition handleWithBlockTransitions(EventSpec receivedSpec) {
-      logger.debug("{}: looking up {} with constraints {}", this, receivedSpec, block.status());
+    private Transition handleWithBlockHeaders(EventSpec receivedSpec) {
+      logger.trace("{}: looking up {} with {}", currentStates, receivedSpec, block.status());
       if (block.isWhitelisted(receivedSpec)) {
         return new Transition(receivedSpec, this, true);
       }
       if (block.isDropped(receivedSpec)) {
+        logger.trace("Dropping event [{}]", receivedSpec);
         return new Transition(receivedSpec, this);
       }
       if (block.isBlacklisted(receivedSpec)) {
+        logger.error("Observed blacklisted event [{}]", receivedSpec);
         return new Transition(receivedSpec, errorState);
       }
       return null;
@@ -670,7 +690,13 @@ class NFA {
       // trigger, inspect, etc
       if (internalEventSpec != null) {
         String error = internalEventSpec.performInternalEvent();
-        return error != null? errorTransition : transitions.get(internalEventSpec);
+        if (error != null) {
+          showCurrentStates();
+          logger.error("{}", error);
+          return errorTransition;
+        } else {
+          return transitions.get(internalEventSpec);
+        }
       }
 
       if (isEndOfLoop()) {
@@ -786,6 +812,12 @@ class NFA {
     String show() {
       StringBuilder sb = new StringBuilder(id);
       sb.append(transitions.values());
+      if (exitTransition != null) {
+        sb.append(exitTransition);
+      }
+      if (loopTransition != null) {
+        sb.append(loopTransition);
+      }
       return sb.toString();
     }
   }

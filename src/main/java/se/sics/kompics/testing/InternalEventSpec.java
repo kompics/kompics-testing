@@ -83,13 +83,13 @@ class InternalEventSpec implements Spec {
         return String.format("Invalid return value from Future %s", future);
       }
     }
-    logger.debug("triggered({})\t", event);
+    logger.trace("triggered({})\t", event);
     port.doTrigger(event, 0, port.getOwner());
     return null;
   }
 
   private String doInspect() {
-    logger.debug("Inspecting Component");
+    logger.trace("Inspecting Component");
     JavaComponent cut = (JavaComponent) definitionUnderTest.getComponentCore();
 
     while (cut.workCount.get() > 0) {
