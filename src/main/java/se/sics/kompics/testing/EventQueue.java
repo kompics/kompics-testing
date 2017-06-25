@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 class EventQueue {
 
-  private long timeoutMS = 400;
+  private long timeoutMS = TestContext.timeout;
   private final LinkedBlockingDeque<EventSpec> q = new LinkedBlockingDeque<EventSpec>();
 
   void setTimeout(long timeout) {
