@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -18,8 +18,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 package se.sics.kompics.testing;
 
-interface MultiEventSpec extends Spec{
-  boolean isComplete();
-}
+/**
+ * Marker interface for a transition Label created from a single statement.
+ * It matches a single input event symbol.
+ */
+interface SingleLabel extends Label { }

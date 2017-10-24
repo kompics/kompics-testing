@@ -26,21 +26,21 @@ import java.util.concurrent.TimeUnit;
 class EventQueue {
 
   private long timeoutMS = TestContext.timeout;
-  private final LinkedBlockingDeque<EventSpec> q = new LinkedBlockingDeque<EventSpec>();
+  private final LinkedBlockingDeque<EventSymbol> q = new LinkedBlockingDeque<EventSymbol>();
 
   void setTimeout(long timeout) {
     this.timeoutMS = timeout;
   }
 
-  void offer(EventSpec event) {
+  void offer(EventSymbol event) {
     q.offer(event);
   }
 
-  void addFirst(EventSpec event) {
+  void addFirst(EventSymbol event) {
     q.addFirst(event);
   }
 
-  EventSpec poll() {
+  EventSymbol poll() {
     try {
       return q.poll(timeoutMS, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {

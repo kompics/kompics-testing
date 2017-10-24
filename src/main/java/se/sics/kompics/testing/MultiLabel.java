@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -20,4 +20,14 @@
  */
 package se.sics.kompics.testing;
 
-interface SingleEventSpec extends Spec{ }
+/**
+ * A Transition Label created by a collection of statements S.
+ * Each statement in S must match exactly one input event symbol
+ * before the transition can be successful (i.e If there are N
+ * statements in S, then N distinct event symbols must be consumed).
+ */
+interface MultiLabel extends Label {
+
+    // Return true if all internal labels have matched an event.
+    boolean hasCompleted();
+}

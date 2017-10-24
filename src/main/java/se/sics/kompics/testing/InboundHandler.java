@@ -38,7 +38,7 @@ class InboundHandler extends ProxyHandler {
   private final Port<? extends PortType> destPort;
   private final PortType portType;
   private final ComponentCore proxyCore;
-  // handle incoming Direct.Request
+  // forwardEvent incoming Direct.Request
   private final Map<Port, JavaPort> originToGhostPort = new HashMap<Port, JavaPort>();
 
   InboundHandler(
@@ -62,13 +62,12 @@ class InboundHandler extends ProxyHandler {
       setupDirectRequest(request, Unsafe.getOrigin(request));
     }
 
-    EventSpec eventSpec = proxy.getFsm().newEventSpec(event, destPort, Direction.IN);
-    eventSpec.setHandler(this);
-    eventQueue.offer(eventSpec);
+    EventSymbol eventSymbol = new EventSymbol(event, destPort, Direction.IN, this);
+    eventQueue.offer(eventSymbol);
   }
 
   @Override
-  public void doHandle(KompicsEvent event) {
+  public void forwardEvent(KompicsEvent event) {
     destPort.doTrigger(event, 0, proxy.getComponentCore());
   }
 
@@ -117,13 +116,12 @@ class InboundHandler extends ProxyHandler {
 
     @Override
     public void handle(KompicsEvent response) {
-      EventSpec eventSpec = proxy.getFsm().newEventSpec(response, destPort, Direction.OUT);
-      eventSpec.setHandler(this);
-      eventQueue.offer(eventSpec);
+      EventSymbol eventSymbol = new EventSymbol(response, destPort, Direction.OUT, this);
+      eventQueue.offer(eventSymbol);
     }
 
     @Override
-    void doHandle(KompicsEvent response) {
+    void forwardEvent(KompicsEvent response) {
       assert response instanceof Direct.Response;
       origin.doTrigger(response, 0, proxyCore);
     }

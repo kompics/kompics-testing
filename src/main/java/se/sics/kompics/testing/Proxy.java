@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -18,6 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 package se.sics.kompics.testing;
 
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ import se.sics.kompics.Init;
 import se.sics.kompics.JavaPort;
 import se.sics.kompics.Kompics;
 import se.sics.kompics.Negative;
-import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Unsafe;
@@ -39,12 +39,12 @@ import java.util.Map;
 
 class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
-  final EventQueue eventQueue = new EventQueue();
+  private final EventQueue eventQueue = new EventQueue();
 
   private T definitionUnderTest;
   PortConfig portConfig;
   private Component cut;
-  private CTRL<T> fsm;
+  private Ctrl<T> ctrl;
 
   private Logger logger = TestContext.logger;
 
@@ -62,8 +62,8 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
     return definitionUnderTest;
   }
 
-  CTRL<T> getFsm() {
-    return fsm;
+  Ctrl<T> getCtrl() {
+    return ctrl;
   }
 
   Component getComponentUnderTest() {
@@ -114,9 +114,8 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
   }
 
   private Fault.ResolveAction addFaultToEventQueue(Fault fault) {
-    EventSpec eventSpec = fsm.newEventSpec(fault, definitionUnderTest.getControlPort(), Direction.OUT);
-    eventSpec.setHandler(ProxyHandler.faultHandler);
-    eventQueue.addFirst(eventSpec);
+    EventSymbol eventSymbol = new EventSymbol(fault, definitionUnderTest.getControlPort(), Direction.OUT, ProxyHandler.faultHandler);
+    eventQueue.addFirst(eventSymbol);
     return Fault.ResolveAction.IGNORE;
   }
 
@@ -133,7 +132,7 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
     portConfig = new PortConfig(this);
     definitionUnderTest = (T) cut.getComponent();
-    fsm = new CTRL<T>(this, definitionUnderTest);
+    ctrl = new Ctrl<T>(this, definitionUnderTest);
     setFaultHandler();
   }
 

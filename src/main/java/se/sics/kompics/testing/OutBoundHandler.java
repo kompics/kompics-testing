@@ -58,13 +58,12 @@ class OutBoundHandler extends ProxyHandler {
       Unsafe.setOrigin(request, portStruct.getInboundPort().getPair());
     }
 
-    EventSpec eventSpec = proxy.getFsm().newEventSpec(event, sourcePort, Direction.OUT);
-    eventSpec.setHandler(this);
-    eventQueue.offer(eventSpec);
+    EventSymbol eventSymbol = new EventSymbol(event, sourcePort, Direction.OUT, this);
+    eventQueue.offer(eventSymbol);
   }
 
   @Override
-  public void doHandle(KompicsEvent event) {
+  public void forwardEvent(KompicsEvent event) {
     if (event instanceof Response) {
       deliverToSingleChannel((Response) event);
     } else {

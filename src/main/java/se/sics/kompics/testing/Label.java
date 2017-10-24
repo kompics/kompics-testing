@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -18,8 +18,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 package se.sics.kompics.testing;
 
-interface Spec {
-  boolean match(EventSpec receivedSpec);
+interface Label {
+
+    // Return true if this label matches the provided event symbol.
+    boolean match(EventSymbol eventSymbol);
 }

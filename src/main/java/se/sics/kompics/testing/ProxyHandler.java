@@ -38,11 +38,11 @@ abstract class ProxyHandler extends Handler {
 
   private ProxyHandler() { }
 
-  abstract void doHandle(KompicsEvent event);
+  abstract void forwardEvent(KompicsEvent event);
 
   static ProxyHandler faultHandler = new ProxyHandler() {
     @Override
-    void doHandle(KompicsEvent event) { }
+    void forwardEvent(KompicsEvent event) { }
 
     @Override
     public void handle(KompicsEvent event) { }
