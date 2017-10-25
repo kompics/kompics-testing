@@ -37,112 +37,169 @@ import se.sics.kompics.Unsafe;
 import se.sics.kompics.testing.scheduler.CallingThreadScheduler;
 import java.util.Map;
 
+/**
+ *  The parent component of the CUT and its external dependencies.
+ */
 class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
 
-  private final EventQueue eventQueue = new EventQueue();
+    // LOG.
+    private Logger logger = TestContext.logger;
 
-  private T definitionUnderTest;
-  PortConfig portConfig;
-  private Component cut;
-  private Ctrl<T> ctrl;
+    // The event symbol queue.
+    private final EventQueue eventQueue = new EventQueue();
 
-  private Logger logger = TestContext.logger;
+    // The component under test.
+    private Component cut;
 
-  Proxy() {
-    getComponentCore().setScheduler(new CallingThreadScheduler());
-  }
+    // The CUT definition.
+    private T definitionUnderTest;
 
-  T createComponentUnderTest(Class<T> definition, Init<T> initEvent) {
-    init(definition, initEvent);
-    return definitionUnderTest;
-  }
+    // Configure monitoring events on the CUT's ports.
+    PortConfig portConfig;
 
-  T createComponentUnderTest(Class<T> definition, Init.None initEvent) {
-    init(definition, initEvent);
-    return definitionUnderTest;
-  }
-
-  Ctrl<T> getCtrl() {
-    return ctrl;
-  }
-
-  Component getComponentUnderTest() {
-    return cut;
-  }
-
-  EventQueue getEventQueue() {
-    return eventQueue;
-  }
-
-  <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init<T> initEvent) {
-    Component c = create(cClass, initEvent);
-    c.getComponent().getComponentCore().setScheduler(null);
-    return c;
-  }
-
-  <T extends ComponentDefinition> Component createSetupComponent(Class<T> cClass, Init.None initEvent) {
-    Component c = create(cClass, initEvent);
-    c.getComponent().getComponentCore().setScheduler(null);
-    return c;
-  }
-
-  <P extends PortType> Negative<P> providePort(Class<P> portType) {
-    return provides(portType);
-  }
-
-  <P extends PortType> Positive<P> requirePort(Class<P> portType) {
-    return requires(portType);
-  }
-
-  Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
-    return Unsafe.getPositivePorts(cut);
-  }
-
-  Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
-    return Unsafe.getNegativePorts(cut);
-  }
-
-  <P extends PortType> void doConnect(
-          Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
-    portConfig.doConnect(positive, negative, factory);
-  }
-
-  @Override
-  public Fault.ResolveAction handleFault(Fault fault) {
-    logger.debug("Fault was thrown {}", fault);
-    return addFaultToEventQueue(fault);
-  }
-
-  private Fault.ResolveAction addFaultToEventQueue(Fault fault) {
-    EventSymbol eventSymbol = new EventSymbol(fault, definitionUnderTest.getControlPort(), Direction.OUT, ProxyHandler.faultHandler);
-    eventQueue.addFirst(eventSymbol);
-    return Fault.ResolveAction.IGNORE;
-  }
-
-  @SuppressWarnings("unchecked")
-  private void init(Class<T> definition, Init<? extends ComponentDefinition> initEvent) {
-    if (definitionUnderTest != null) {
-      return;
-    }
-    if (initEvent == Init.NONE) {
-      cut = create(definition, (Init.None) initEvent);
-    } else {
-      cut = create(definition, (Init<T>) initEvent);
+    Proxy() {
+        // Set the proxy scheduler.
+        getComponentCore().setScheduler(new CallingThreadScheduler());
     }
 
-    portConfig = new PortConfig(this);
-    definitionUnderTest = (T) cut.getComponent();
-    ctrl = new Ctrl<T>(this, definitionUnderTest);
-    setFaultHandler();
-  }
+    // Create the CUT with the provided component definition and init.
+    T createComponentUnderTest(Class<T> definition, Init<T> initEvent) {
+        init(definition, initEvent);
+        return definitionUnderTest;
+    }
 
-  private void setFaultHandler() {
-    FaultHandler fh = new FaultHandler() {
-      @Override
-      public Fault.ResolveAction handle(Fault f) {
-        return addFaultToEventQueue(f);
-      }
-    };
-    Kompics.setFaultHandler(fh);
-  }
+    // Create the CUT with the provided component definition and init.
+    T createComponentUnderTest(Class<T> definition, Init.None initEvent) {
+        init(definition, initEvent);
+        return definitionUnderTest;
+    }
+
+    // Return the CUT.
+    Component getComponentUnderTest() {
+        return cut;
+    }
+
+    // Return the event queue.
+    EventQueue getEventQueue() {
+        return eventQueue;
+    }
+
+    // Create an external dependency component.
+    <T extends ComponentDefinition>
+    Component createSetupComponent(Class<T> cClass, Init<T> initEvent) {
+        Component c = create(cClass, initEvent);
+        // Set the scheduler initially to null.
+        // It will be set to the default by Kompics when the
+        // component receives its first event.
+        c.getComponent().getComponentCore().setScheduler(null);
+        return c;
+    }
+
+    // Create an external dependency component.
+    <T extends ComponentDefinition>
+    Component createSetupComponent(Class<T> cClass, Init.None initEvent) {
+        Component c = create(cClass, initEvent);
+        // Set the scheduler initially to null.
+        // It will be set to the default by Kompics when the
+        // component receives its first event.
+        c.getComponent().getComponentCore().setScheduler(null);
+        return c;
+    }
+
+    // Create a mirror of the specified provided port on this proxy component.
+    <P extends PortType> Negative<P> providePort(Class<P> portType) {
+        return provides(portType);
+    }
+
+    // Create a mirror of the specified provided port on this proxy component.
+    <P extends PortType> Positive<P> requirePort(Class<P> portType) {
+        return requires(portType);
+    }
+
+    // Get the port types for the provided ports of the CUT.
+    Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutPositivePorts() {
+        return Unsafe.getPositivePorts(cut);
+    }
+
+    // Get the port types for the required ports of the CUT.
+    Map<Class<? extends PortType>, JavaPort<? extends PortType>> getCutNegativePorts() {
+        return Unsafe.getNegativePorts(cut);
+    }
+
+    // Connect the specified ports using the specified factory.
+    <P extends PortType> void doConnect(Positive<P> positive,
+                                        Negative<P> negative,
+                                        ChannelFactory factory) {
+        portConfig.connect(positive, negative, factory);
+    }
+
+    // Set action to be taken when an exception is thrown
+    // within the test case - e.g while executing CUT or
+    // external dependency handlers.
+    @Override
+    public Fault.ResolveAction handleFault(Fault fault) {
+        logger.debug("Fault was thrown {}", fault);
+
+        // Add the fault to the event queue (it might be expected).
+        return addFaultToEventQueue(fault);
+    }
+
+    // Adds the specified fault to the event symbol queue.
+    private Fault.ResolveAction addFaultToEventQueue(Fault fault) {
+        // Create event symbol for fault event.
+        EventSymbol eventSymbol = new EventSymbol(fault,
+                                                  definitionUnderTest.getControlPort(),
+                                                  Direction.OUT,
+                                                  ProxyHandler.faultHandler);
+
+        // Add as the first element in the queue.
+        // If the fault is expected, then the next
+        // expect statement must be a match.
+        // If the fault is not expected
+        // then the exception is detected as soon as possible.
+        // and the test case should fail.
+        eventQueue.addFirst(eventSymbol);
+
+        // We wouldn't know how to resolve the fault.
+        return Fault.ResolveAction.IGNORE;
+    }
+
+    // initialize proxy.
+    @SuppressWarnings("unchecked")
+    private void init(Class<T> definition, Init<? extends ComponentDefinition> initEvent) {
+        // Have we already run this init before?
+        if (definitionUnderTest != null)
+            // If yes, do nothing.
+            return;
+
+        // Create the component under test as a child component.
+        if (initEvent == Init.NONE)
+            cut = create(definition, (Init.None) initEvent);
+        else
+            cut = create(definition, (Init<T>) initEvent);
+
+        // set the CUT definition.
+        definitionUnderTest = (T) cut.getComponent();
+
+        // Initialize the port configuration.
+        portConfig = new PortConfig(this);
+
+        // Set the default Kompics fault handler.
+        setKompicsFaultHandler();
+    }
+
+    // Set the default Kompics fault handler for handling exceptions
+    // within the framework or Kompics.
+    private void setKompicsFaultHandler() {
+        FaultHandler fh = new FaultHandler() {
+            @Override
+            public Fault.ResolveAction handle(Fault f) {
+                // Add the fault to the event queue.
+                return addFaultToEventQueue(f);
+            }
+        };
+
+        // Set handler.
+        Kompics.setFaultHandler(fh);
+    }
 }

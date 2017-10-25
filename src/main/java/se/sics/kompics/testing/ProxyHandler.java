@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -18,33 +18,51 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 package se.sics.kompics.testing;
 
 import se.sics.kompics.Handler;
 import se.sics.kompics.KompicsEvent;
 
+/**
+ *  A Handler for intercepting events on the CUT's ports.
+ */
 abstract class ProxyHandler extends Handler {
-  Proxy proxy;
-  PortStructure portStruct;
-  EventQueue eventQueue;
+    // The proxy component.
+    Proxy proxy;
 
-  ProxyHandler(
-          Proxy proxy, PortStructure portStruct, Class<? extends KompicsEvent> eventType) {
-    setEventType(eventType);
-    this.proxy = proxy;
-    this.eventQueue = proxy.getEventQueue();
-    this.portStruct = portStruct;
-  }
+    // The PortStructure for the port on which this handler
+    // intercepts events.
+    PortStructure portStruct;
 
-  private ProxyHandler() { }
+    // Event queue to which intercepted events are added.
+    EventQueue eventQueue;
 
-  abstract void forwardEvent(KompicsEvent event);
+    ProxyHandler(Proxy proxy,
+                 PortStructure portStruct,
+                 Class<? extends KompicsEvent> eventType) {
+        // Intercept events of subtype eventType.
+        setEventType(eventType);
 
-  static ProxyHandler faultHandler = new ProxyHandler() {
-    @Override
-    void forwardEvent(KompicsEvent event) { }
+        this.proxy = proxy;
+        this.eventQueue = proxy.getEventQueue();
+        this.portStruct = portStruct;
+    }
 
-    @Override
-    public void handle(KompicsEvent event) { }
-  };
+    private ProxyHandler() { }
+
+    // Forward event to recipient(s).
+    abstract void forwardEvent(KompicsEvent event);
+
+    // Handler for observed fault events.
+    static final ProxyHandler faultHandler = new ProxyHandler() {
+        @Override
+        void forwardEvent(KompicsEvent event) {
+        }
+
+        @Override
+        public void handle(KompicsEvent event) {
+        }
+
+    };
 }

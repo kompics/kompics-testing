@@ -1,4 +1,4 @@
-/**
+/*
  * This file is part of the Kompics Testing runtime.
  *
  * Copyright (C) 2017 Swedish Institute of Computer Science (SICS)
@@ -18,6 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 package se.sics.kompics.testing;
 
 import se.sics.kompics.ChannelFactory;
@@ -38,83 +39,165 @@ import java.util.Map;
 
 import static se.sics.kompics.testing.Direction.*;
 
+/**
+ * Set up the ports owned (provided and required) by the CUT
+ * in order to monitor events that go in and out of them.
+ */
 class PortConfig {
+    /**
+     *  Contains a {@link PortStructure} instance for each
+     *  port owned by the CUT.
+     */
+    private final Map<Port<? extends PortType>, PortStructure> portStructs =
+        new HashMap<Port<? extends PortType>, PortStructure>();
 
-  private final Map<Port<? extends PortType>, PortStructure> portStructs = new HashMap<Port<? extends PortType>, PortStructure>();
-  private final Proxy proxy;
+    // The proxy component.
+    private final Proxy proxy;
 
-  PortConfig(Proxy proxy) {
-    this.proxy = proxy;
-    setupPortStructures();
-  }
+    PortConfig(Proxy proxy) {
+        this.proxy = proxy;
 
-  private void setupPortStructures() {
-    setupPortStructures(true);  // provided ports
-    setupPortStructures(false); // required ports
-  }
+        // Monitor provided ports of the CUT.
+        monitorPorts(true);
 
-  private void setupPortStructures(boolean provided) {
-    Map<Class<? extends PortType>, JavaPort<? extends PortType>> ports =
-            provided? proxy.getCutPositivePorts() : proxy.getCutNegativePorts();
-
-    for (Class<? extends PortType> portType : ports.keySet()) {
-      Port<? extends PortType> outboundPort = ports.get(portType);
-
-      if (!isMonitoredPort(portType)) {
-        continue;
-      }
-
-      Port<? extends PortType> inboundPort =
-              provided? proxy.providePort(portType) : proxy.requirePort(portType);
-
-      PortStructure portStruct = new PortStructure(proxy, inboundPort, outboundPort, provided);
-
-      portStructs.put(outboundPort, portStruct);
+        // Monitor required ports of the CUT.
+        monitorPorts(false); // required ports
     }
-  }
-  <P extends PortType> void doConnect(Positive<P> positive, Negative<P> negative, ChannelFactory factory) {
 
-    boolean cutOwnsPositive = positive.getPair().getOwner() == proxy.getComponentUnderTest();
-    boolean cutOwnsNegative = negative.getPair().getOwner() == proxy.getComponentUnderTest();
+    /**
+     *  Create a {@link PortStructure} instance for each
+     *  port provided or required by the CUT.
+     *  if provided is set to true, then the provided
+     *  ports are set up - otherwise the required ports are
+     *  set up.
+     */
+    @SuppressWarnings("unchecked")
+    private void monitorPorts(boolean provided) {
+        // Contains the provided or required outside ports of the CUT
+        // depending on the value of $provided.
+        // These ports have their owners set to proxy.
+        Map<Class<? extends PortType>, JavaPort<? extends PortType>> ports;
 
-    PortCore<P> proxyPort = (PortCore<P>) (cutOwnsPositive? positive : negative);
-    PortCore<P> otherPort = (PortCore<P>) (cutOwnsPositive? negative : positive);
+        // Should we set up the provided ports?
+        if (provided)
+            // If yes, then get the CUT's positive ports.
+            ports = proxy.getCutPositivePorts();
+        else
+            // Otherwise, we get its negative ports.
+            ports = proxy.getCutNegativePorts();
 
-    portStructs.get(proxyPort).addConnectedPort(otherPort, factory);
+        // For each port P, create a similar port on the proxy
+        // component and initialize a PortStructure for P.
+        for (Map.Entry<Class<? extends PortType>, JavaPort<? extends PortType>> entry : ports.entrySet()) {
+            // The PortType of P.
+            Class<? extends PortType> portType = entry.getKey();
 
-    if (cutOwnsPositive && cutOwnsNegative) {
-      portStructs.get(otherPort).addConnectedPort(proxyPort, factory);
+            // The outside port of P.
+            Port<? extends PortType> outsidePort = entry.getValue();
+
+            // Do not monitor Control and Loopback ports.
+            if (!isMonitoredPort(portType))
+                continue;
+
+            // Create a port mirroring P and return its inside port.
+            Port<? extends PortType> mirroredInsidePort;
+            if (provided)
+                mirroredInsidePort = proxy.providePort(portType);
+            else
+                mirroredInsidePort = proxy.requirePort(portType);
+
+            // Create a PortStructure for P.
+            PortStructure portStruct = new PortStructure(proxy,
+                                                         mirroredInsidePort,
+                                                         outsidePort,
+                                                         provided);
+
+            // Finally, add the created PortStructure for P.
+            portStructs.put(outsidePort, portStruct);
+        }
     }
-  }
 
-  boolean isConnectedPort(Port<? extends PortType> port) {
-    PortStructure portStruct = portStructs.get(port);
-    return !(portStruct == null || portStruct.getConnectedPorts().isEmpty());
-  }
+    // Connect the positive and negative port via the provided
+    // channel factory and monitor the ports owned by the CUT.
+    <P extends PortType> void connect(Positive<P> positive,
+                                      Negative<P> negative,
+                                      ChannelFactory factory) {
 
-  boolean portDeclaresEvent(
-      Class<? extends KompicsEvent> eventType, Port<? extends PortType> port, Direction direction) {
-    PortStructure portStruct = portStructs.get(port);
-    Collection<Class<? extends KompicsEvent>> declaredEvents;
-    if (portStruct.isProvidedPort) {
-      if (direction == IN) {
-        declaredEvents = Unsafe.getNegativeEvents(port.getPortType());
-      } else {
-        declaredEvents = Unsafe.getPositiveEvents(port.getPortType());
-      }
+        // Mark the inside port(s) of the CUT
+        // (outside ports will always belong to proxy).
+        boolean cutOwnsPositive =
+            positive.getPair().getOwner() == proxy.getComponentUnderTest();
+        boolean cutOwnsNegative =
+            negative.getPair().getOwner() == proxy.getComponentUnderTest();
+
+        // Set the port owned by the CUT. This port will be monitored.
+        PortCore<P> cutPort = (PortCore<P>) (cutOwnsPositive ? positive
+                                                             : negative);
+
+        // Set the port owned by the other component C. This will only be
+        // monitored if C is also the CUT.
+        PortCore<P> otherPort = (PortCore<P>) (cutOwnsPositive ? negative
+                                                               : positive);
+
+        // Monitor events going in and out of the CUT's port.
+        portStructs.get(cutPort).connect(otherPort, factory);
+
+        // Monitor events on the other port if the CUT owns it as well.
+        if (cutOwnsPositive && cutOwnsNegative)
+            portStructs.get(otherPort).connect(cutPort, factory);
     }
-    else {
-      if (direction == IN) {
-        declaredEvents = Unsafe.getPositiveEvents(port.getPortType());
-      } else {
-        declaredEvents = Unsafe.getNegativeEvents(port.getPortType());
-      }
-    }
-    return declaredEvents.contains(eventType);
-  }
 
-  private boolean isMonitoredPort(Class<? extends PortType> portClass) {
-    return !(portClass.equals(LoopbackPort.class) || portClass.equals(ControlPort.class));
-  }
+    // Return true if the provided port P is monitored by this PortConfig and
+    // there is at least one other port connected to P.
+    boolean isConnectedPort(Port<? extends PortType> P) {
+        // Get the PortStructure for P.
+        PortStructure portStruct = portStructs.get(P);
+
+        if (portStruct != null && !portStruct.getConnectedPorts().isEmpty())
+            return true;
+
+        // Port is not monitored and connected.
+        return false;
+    }
+
+    // Return true if the port type of port P allows events belonging
+    // to class eventType in the specified direction.
+    boolean portDeclaresEvent(Class<? extends KompicsEvent> eventType,
+                              Port<? extends PortType> P,
+                              Direction direction) {
+
+        // Get the PortStructure for port P.
+        PortStructure portStruct = portStructs.get(P);
+
+        // Contains the event types allowed by P's portType in the
+        // specified direction.
+        Collection<Class<? extends KompicsEvent>> allowedTypes;
+
+        // Is P a provided port of the CUT?
+        if (portStruct.isProvidedPort) {
+            // If yes, Negative events are incoming to P while
+            // Positive events are outgoing from P.
+            if (direction == IN)
+                allowedTypes = Unsafe.getNegativeEvents(P.getPortType());
+            else
+                allowedTypes = Unsafe.getPositiveEvents(P.getPortType());
+        } else {
+            // Otherwise, Positive events are incoming to P while
+            // Negative events are outgoing from P.
+            if (direction == IN)
+                allowedTypes = Unsafe.getPositiveEvents(P.getPortType());
+            else
+                allowedTypes = Unsafe.getNegativeEvents(P.getPortType());
+        }
+
+        // Return true if the specified eventType is allowed.
+        return allowedTypes.contains(eventType);
+    }
+
+    // Return true if the specified port class should not be monitored
+    // for events by the framework.
+    private boolean isMonitoredPort(Class<? extends PortType> portClass) {
+        return !(portClass.equals(LoopbackPort.class) || portClass.equals(ControlPort.class));
+    }
 
 }
