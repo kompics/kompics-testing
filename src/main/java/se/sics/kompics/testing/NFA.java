@@ -27,7 +27,6 @@ import se.sics.kompics.KompicsEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -76,7 +75,6 @@ class NFA {
 
     // The Transition leading to the error state.
     private final Transition ERROR_TRANSITION;
-    private final Collection<Transition> errorTransition;
 
     // Log.
     private Logger logger = TestContext.logger;
@@ -101,7 +99,6 @@ class NFA {
         // Create Error State and Transition.
         errorState = new State(0, initialBlock);
         ERROR_TRANSITION = new Transition(null, errorState);
-        errorTransition = Collections.singleton(ERROR_TRANSITION);
     }
 
     // Return and increment next available ID for a new state.
@@ -328,12 +325,12 @@ class NFA {
         for (State state : currentStates) {
             if (state.canPerformInternalTransition()) {
                 // perform internal transition associated with this active state.
-                Collection<Transition> transitions = state.performInternalTransition();
-                assert !transitions.isEmpty();
+                Transition t = state.performInternalTransition();
+                assert t != null;
                 // add next state to reachable
-                for (Transition t : transitions) {
-                    nextStates.add(t.nextState);
-                }
+                nextStates.add(t.nextState);
+                //for (Transition t : transitions) {
+                //}
             }
         }
     }
@@ -372,43 +369,59 @@ class NFA {
         }
     }
 
-  private void updateCurrentState(Set<State> nextStates) {
-    logger.trace("{}: new state is {}", currentStates, nextStates);
+    private void updateCurrentState(Set<State> nextStates) {
+        logger.trace("{}: new state is {}", currentStates, nextStates);
 
-    // recompute active blocks
-    activeBlocks.clear();
+        // Compute active blocks (blocks that have at least
+        // one state in the nextStates).
+        activeBlocks.clear();
 
-    // reset discontinued blocks
-    Block block;
-    for (State state : nextStates) {
-      block = state.block;
-      while (block != null && !activeBlocks.contains(block)) {
-        activeBlocks.add(block);
-        block = block.previousBlock;
-      }
+        Block block;
+        for (State state : nextStates) {
+            block = state.block;
+            // Has this block been added previously?
+            while (block != null && !activeBlocks.contains(block)) {
+                // If no, add it.
+                activeBlocks.add(block);
+
+                // If a block b is active, then its
+                // parent block is also active.
+                // So we recursively add its parent block.
+                block = block.previousBlock;
+            }
+        }
+
+        // Blocks which have a state in the currentStates but not
+        // in the nextStates have been discontinued (their thread
+        // has been killed by the NFA).
+        // Reset discontinued blocks.
+        Set<Block> discontinued = new HashSet<Block>();
+        for (State state : currentStates) {
+            if (!nextStates.contains(state)
+                && !activeBlocks.contains(state.block)) {
+
+                // Don't call reset more than once on the same block.
+                if (discontinued.add(state.block))
+                    state.block.reset();
+            }
+        }
+
+        // Set current states to next states.
+        currentStates.clear();
+        for (State state : nextStates) {
+            assert !state.eclosure().isEmpty();
+            currentStates.addAll(state.eclosure());
+        }
     }
-
-    for (State state : currentStates) {
-      if (!nextStates.contains(state) && !activeBlocks.contains(state.block)) {
-        state.block.reset();
-      }
-    }
-
-    // update current state
-    currentStates.clear();
-    for (State state : nextStates) {
-      assert !state.eclosure().isEmpty();
-      currentStates.addAll(state.eclosure());
-    }
-  }
 
     // Check if any default action matching this event was registered.
     // If found, handle the event as requested and return true.
     private boolean handleWithDefaultAction(EventSymbol eventSymbol) {
         Action action = getDefaultAction(eventSymbol);
-        if (action == null) {
+
+        // No default action for event.
+        if (action == null)
             return false;
-        }
 
         // We successfully matched this event using a default action.
         if (action == Action.FAIL) {
@@ -449,8 +462,9 @@ class NFA {
 
     // Return the action received by calling the registered function
     // with the event.
-    private <E extends KompicsEvent> Action actionFor(KompicsEvent event,
-                                                      Class<? extends KompicsEvent> registeredType) {
+    private <E extends KompicsEvent>
+    Action actionFor(KompicsEvent event,
+                     Class<? extends KompicsEvent> registeredType) {
         Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
         Action action = function.apply((E) event);
 
@@ -500,7 +514,7 @@ class NFA {
 
             // Print exit transition if any.
             if (s.exitTransition != null) {
-                State exit = s.exitTransition.iterator().next().nextState;
+                State exit = s.exitTransition.nextState;
                 logger.trace("\t\t\tEXIT {}", exit);
 
                 if (seen.add(exit.id))
@@ -509,7 +523,7 @@ class NFA {
 
             // Print loop transition if any.
             if (s.loopTransition != null) {
-                State loop = s.loopTransition.iterator().next().nextState;
+                State loop = s.loopTransition.nextState;
                 logger.trace("\t\t\tLOOP {}", loop);
 
                 if (seen.add(loop.id))
@@ -696,10 +710,10 @@ class NFA {
             assert endState.isRepeatEnd;
 
             // Add a (NULL) transition to exit out of this block.
-            endState.exitTransition.add(new Transition(null, finalFA.startState));
+            endState.setExitTransition(new Transition(null, finalFA.startState));
 
             // Add a (NULL) transition to loop back to the start of this block.
-            endState.loopTransition.add(new Transition(null, startState));
+            endState.setLoopTransition(new Transition(null, startState));
 
             // Make sure we initialize our block before any nested blocks.
             registerParentBlock();
@@ -758,7 +772,7 @@ class NFA {
             assert endState.isKleeneEnd;
 
             // Add (NULL) transition to loop back to start state from end state.
-            endState.loopTransition.add(new Transition(null, startState));
+            endState.setLoopTransition(new Transition(null, startState));
 
             // Add e-transition to exit out of this block.
             // We use EPSILON transitions to compute the e-closure of a state.
@@ -944,7 +958,7 @@ class NFA {
         Set<State> eclosure;
 
         // Transition from this state to itself and forward associated event.
-        Transition selfTransitionAndHandle = new Transition(null, this, true);
+        Transition selfTransitionAndForward = new Transition(null, this, true);
 
         // Transition from this state to itself without forwarding the associated event.
         Transition selfTransitionAndDrop = new Transition(null, this, false);
@@ -952,11 +966,10 @@ class NFA {
         // Special Internal transitions for start/end of blocks //
 
         // Loop back transition from the end state of a block to it's start state.
-        Collection<Transition> loopTransition;
+        Transition loopTransition;
+
         // Transition from the end state of a block to the next state outside its block.
-        Collection<Transition> exitTransition;
-        // Transition from this state to itself as the next state.
-        Collection<Transition> selfTransition;
+        Transition exitTransition;
 
         State(int number, Block block) {
             this.block = block;
@@ -975,14 +988,14 @@ class NFA {
 
             // Don't transition out of completed loop on event.
             // This would be done later on if necessary so do nothing this time.
-            if (isEndOfLoop() && !block.hasPendingEvents()) {
+            if (isEndOfLoop() && !block.hasPendingEvents())
                 return match;
-            }
 
-            // Match this event symbol using any enclosing blockExpect statements.
-            if (block.match(eventSymbol)) {
-                match.add(selfTransitionAndHandle); // forwardEvent received event
-            }
+            // Can we match this event symbol using any
+            // enclosing blockExpect statements.
+            if (block.match(eventSymbol))
+                // If yes, we forward the event and stay in the same state.
+                match.add(selfTransitionAndForward);
 
             // Did we find any match for this event?
             if (match.isEmpty()) {
@@ -1050,7 +1063,7 @@ class NFA {
             if (block.isWhitelisted(eventSymbol)) {
                 // If yes, forward it.
                 logger.trace("Forwarding event [{}]", eventSymbol);
-                return selfTransitionAndHandle;
+                return selfTransitionAndForward;
             }
 
             // Should we drop this event?
@@ -1082,7 +1095,7 @@ class NFA {
          *  {@link #canPerformInternalTransition()} must return true immediately
          *  before its invocation.
          */
-        Collection<Transition> performInternalTransition() {
+        Transition performInternalTransition() {
             // Is this the start state of a Repeat/Kleene block?
             if (isStartOfLoop()) {
                 // If yes, run any entry functions available.
@@ -1102,10 +1115,10 @@ class NFA {
                     // If yes, print to stdErr and return an
                     // error transition instead.
                     logger.error("{}", error);
-                    return errorTransition;
+                    return ERROR_TRANSITION;
                 } else {
                     // Otherwise return the internal transition.
-                    return Collections.singletonList(internalTransition);
+                    return internalTransition;
                 }
             }
 
@@ -1187,11 +1200,11 @@ class NFA {
          *
          * @return the selected transition from this state.
          */
-        Collection<Transition> getLoopEndTransition() {
+        Transition getLoopEndTransition() {
             // Are we waiting for some events to occur within our current block B?
             if (block.hasPendingEvents())
                 // If yes, Case 1: do not transition out of this state.
-                return selfTransition;
+                return selfTransitionAndDrop;
 
             // Otherwise, we can safely exit this state.
             logger.trace("end{} count = {}", block, block.getCurrentCount());
@@ -1261,17 +1274,19 @@ class NFA {
         // Initialize this state as the end state of a repeat block
         void setRepeatEnd() {
             isRepeatEnd = true;
-            loopTransition = new HashSet<Transition>();
-            exitTransition = new HashSet<Transition>();
-            selfTransition = Collections.singleton(selfTransitionAndDrop);
         }
 
         // Initialize this state as the end state of a repeat block
         void setKleeneEnd() {
             isKleeneEnd = true;
-            loopTransition = new HashSet<Transition>();
-            selfTransition = new HashSet<Transition>();
-            selfTransition = Collections.singleton(selfTransitionAndDrop);
+        }
+
+        void setLoopTransition(Transition loopTransition) {
+            this.loopTransition = loopTransition;
+        }
+
+        void setExitTransition(Transition exitTransition) {
+            this.exitTransition = exitTransition;
         }
 
         private boolean isEndOfLoop() {
@@ -1298,11 +1313,11 @@ class NFA {
 
             // Include exit transition if one exists.
             if (exitTransition != null)
-                result.addAll(exitTransition);
+                result.add(exitTransition);
 
             // Include loop transition if one exists.
             if (loopTransition != null)
-                result.addAll(loopTransition);
+                result.add(loopTransition);
 
             return result;
         }
