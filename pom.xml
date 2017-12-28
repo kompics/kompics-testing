@@ -10,25 +10,17 @@
 <properties>
     <java.compiler.version>1.7</java.compiler.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <kompics.version>1.0.0-SNAPSHOT</kompics.version>
+    <kompics.version>[1.0-SNAPSHOT,)</kompics.version>
 </properties>
 
 
 <dependencies>
-		<!--kompics-testing does not require timer. core should provide typesafeconfig instead-->
     <dependency>
-        <groupId>se.sics.kompics.basic</groupId>
-        <artifactId>kompics-port-timer</artifactId>
-        <version>${kompics.version}</version>
-        <scope>compile</scope>
-    </dependency>
-		<!--needs changes to unsafe-->
-<!--    <dependency>
         <groupId>se.sics.kompics</groupId>
         <artifactId>kompics-core</artifactId>
         <version>${kompics.version}</version>
-        <scope>compile</scope>
-    </dependency>-->
+        <scope>provided</scope>
+    </dependency>
     <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
