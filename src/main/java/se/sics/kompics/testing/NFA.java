@@ -25,44 +25,24 @@ import com.google.common.base.Function;
 import org.slf4j.Logger;
 import se.sics.kompics.KompicsEvent;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import java.util.TreeMap;
 
 class NFA {
 
     // Next available ID for a new state.
     private int stateId = 1;
 
-    // Partially sort classes according to their hierarchy with subclasses
-    // coming before superclasses.
-    private final Comparator<Class<? extends KompicsEvent>> eventComparator =
-        new Comparator<Class<? extends KompicsEvent>>() {
-        @Override
-        public int compare(Class<? extends KompicsEvent> e1,
-                           Class<? extends KompicsEvent> e2) {
-            if (e1 == e2) {
-                return 0;
-            } else if (e1.isAssignableFrom(e2)) {
-                return 1;
-            } else {
-                return -1;
-            }
-        }
-    };
-
-    // Registered default action.
-    // Sorted map from a given class to registered function.
-    // The map is sorted with subclasses first.
-    private final Map<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> defaultActions =
-        new TreeMap<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventComparator);
+    // Registered default actions.
+    private final List<Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>> defaultActions =
+        new ArrayList<Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>>();
 
     // The Main RepeatFA within which the entire test case is executed.
     private RepeatFA repeatMain;
@@ -113,7 +93,7 @@ class NFA {
     <E extends KompicsEvent>
     void registerDefaultAction(Class<E> eventType,
                                Function<E, Action> predicate) {
-        defaultActions.put(eventType, predicate);
+        defaultActions.add(new AbstractMap.SimpleImmutableEntry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventType, predicate));
     }
 
     // Add this transition label as a child of the current FA.
@@ -447,30 +427,32 @@ class NFA {
         KompicsEvent event = eventSymbol.getEvent();
         Class<? extends KompicsEvent> eventType = event.getClass();
 
-        // Find the registered Function with the tightest class match to
-        // the event.
-        for (Class<? extends KompicsEvent> registeredType : defaultActions.keySet()) {
-            if (registeredType.isAssignableFrom(eventType)) {
-                // Get the action for the event.
-                return actionFor(event, registeredType);
+        // Find the registered Function with the tightest class match to the event.
+        Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> match = null;
+        for (Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> entry : defaultActions) {
+            if (entry.getKey().isAssignableFrom(eventType)) {
+                if (match == null || match.getKey().isAssignableFrom(entry.getKey()))
+                    match = entry;
             }
         }
 
-        // No registered function for this event.
-        return null;
+        if (match != null)
+            return getDefaultActionHelper(event, match);
+        else
+            return null;
     }
 
     // Return the action received by calling the registered function
     // with the event.
     private <E extends KompicsEvent>
-    Action actionFor(KompicsEvent event,
-                     Class<? extends KompicsEvent> registeredType) {
-        Function<E, Action> function = (Function<E, Action>) defaultActions.get(registeredType);
+    Action getDefaultActionHelper(KompicsEvent event,
+                                  Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> match) {
+        Function<E, Action> function = (Function<E, Action>) match.getValue();
         Action action = function.apply((E) event);
 
         if (action == null) {
             throw new NullPointerException(String.format("(default handler for %s returned null for event '%s')",
-                registeredType, event));
+                match.getKey(), event));
         }
         return action;
     }

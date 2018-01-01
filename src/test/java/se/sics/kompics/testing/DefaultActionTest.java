@@ -147,4 +147,20 @@ public class DefaultActionTest extends TestHelper{
     assert tc.check();
     assertEquals(N, pingsReceived(ponger));
   }
+
+  @Test
+  public void multipleMatches() {
+      // We always pick the tighter matching class.
+    int N = 3;
+    tc
+      .setDefaultAction(KompicsEvent.class, defaultFail)
+      .setDefaultAction(SubPing.class, pingDefaultHandle)
+      .body()
+        .repeat(N).body()
+          .trigger(sping(0), pingerPort.getPair())
+        .end()
+    ;
+    assert tc.check();
+    assertEquals(N, pingsReceived(ponger));
+  }
 }
