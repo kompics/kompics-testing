@@ -22,11 +22,10 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Predicate;
+import java.util.Comparator;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
-
-import java.util.Comparator;
 
 /**
  * A state transition label in the NFA that matches a single
@@ -109,7 +108,7 @@ class EventLabel implements SingleLabel {
     // Return true if this label's predicate matches the observed event.
     private boolean predicateMatch(KompicsEvent observed) {
         // Is this the expected class of event?
-        if (eventType != observed.getClass())
+        if (!(eventType.isAssignableFrom(observed.getClass())))
             return false;
 
         // If yes, Invoke predicate with the observed event.
