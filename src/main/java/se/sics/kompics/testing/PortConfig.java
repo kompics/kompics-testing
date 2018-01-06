@@ -191,7 +191,12 @@ class PortConfig {
         }
 
         // Return true if the specified eventType is allowed.
-        return allowedTypes.contains(eventType);
+        for (Class<? extends KompicsEvent> type : allowedTypes) {
+            if (type.isAssignableFrom(eventType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Return true if the specified port class should not be monitored

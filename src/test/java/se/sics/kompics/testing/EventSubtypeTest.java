@@ -50,7 +50,7 @@ public class EventSubtypeTest {
     assertTrue(tc.check());
   }
   
-  //@Test
+  @Test
   public void test2() {
     TestContext<AComp> tc = TestContext.newInstance(AComp.class);
     Component comp = tc.getComponentUnderTest();
