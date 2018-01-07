@@ -154,7 +154,7 @@ class Ctrl<T extends ComponentDefinition> {
     }
 
     // Black-list events matched by this label within the current block.
-    void blacklist(SingleLabel label) {
+    void blacklist(EventLabel label) {
         // Verify allowed modes for this statement.
         assertMode(HEADER);
 
@@ -163,7 +163,7 @@ class Ctrl<T extends ComponentDefinition> {
     }
 
     // White-list events matched by this label within the current block.
-    void whitelist(SingleLabel label) {
+    void whitelist(EventLabel label) {
         // Verify allowed modes for this statement.
         assertMode(HEADER);
 
@@ -172,7 +172,7 @@ class Ctrl<T extends ComponentDefinition> {
     }
 
     // Do not forward events matched by this label.
-    void drop(SingleLabel label) {
+    void drop(EventLabel label) {
         // Verify allowed modes for this statement.
         assertMode(HEADER);
 
@@ -202,7 +202,7 @@ class Ctrl<T extends ComponentDefinition> {
     }
 
     // Add a state transition with the provided label to the current block.
-    void blockExpect(SingleLabel label) {
+    void blockExpect(EventLabel label) {
         // Verify allowed modes for this statement.
         assertMode(HEADER);
 

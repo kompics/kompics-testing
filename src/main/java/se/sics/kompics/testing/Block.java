@@ -20,6 +20,7 @@
  */
 package se.sics.kompics.testing;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -31,6 +32,16 @@ import java.util.Set;
  * A Block can either be a Repeat block or a Kleene block.
  */
 class Block {
+    // Block header.
+    private static class BLOCK_HEADER {
+        final EventLabel event;
+        final Action action;
+        BLOCK_HEADER (EventLabel event, Action action) {
+            this.event = event;
+            this.action = action;
+        }
+    }
+
     // If this is a Repeat block, set the number of iterations at a time.
     final int count;
 
@@ -61,14 +72,8 @@ class Block {
     // Set to true if we are currently executing statements belonging to this block.
     private boolean currentlyExecuting;
 
-    // Events matched by these labels cause the test case to fail immediately.
-    private Set<SingleLabel> disallowed;
-
-    // Events matched by these labels are forwarded.
-    private Set<SingleLabel> allowed;
-
-    // Events matched by these labels are NOT forwarded.
-    private Set<SingleLabel> dropped;
+    // Store all block header declarations in added order.
+    private final ArrayList<BLOCK_HEADER> headerDeclarations;
 
     // Expected event within an iteration of this block.
     private List<SingleLabel> expected = new LinkedList<SingleLabel>();
@@ -92,16 +97,16 @@ class Block {
 
         this.previousBlock = previousBlock;
 
+        headerDeclarations = new ArrayList<BLOCK_HEADER>();
+
         // Do we have a parent block?
         if (previousBlock != null) {
-            // If yes, we must be a nested block - initialize our data structures using parent.
-            this.disallowed = new HashSet<SingleLabel>(previousBlock.disallowed);
-            this.allowed = new HashSet<SingleLabel>(previousBlock.allowed);
-            this.dropped = new HashSet<SingleLabel>(previousBlock.dropped);
+            // If yes, we must be a nested block - initialize block headers
+            // based on parent.
+            headerDeclarations.addAll(previousBlock.headerDeclarations);
         } else {
             // Otherwise, we must be the MainBlock
             isMainBlock = true;
-            initEmptyBlock();
         }
     }
 
@@ -272,69 +277,37 @@ class Block {
         return !pending.isEmpty();
     }
 
-    // Initialize MainBlock.
-    private void initEmptyBlock() {
-        disallowed = new HashSet<SingleLabel>();
-        allowed = new HashSet<SingleLabel>();
-        dropped = new HashSet<SingleLabel>();
-    }
-
     // Expect an event to be observed within this Block. (blockExpect).
-    void expect(SingleLabel label) {
+    void expect(EventLabel label) {
         expected.add(label);
         // Add to pending for initial iteration.
         pending.add(label);
     }
 
     // Black-list events matched by this label.
-    void blacklist(SingleLabel label) {
-        // If an equivalent statement for this label exists, remove it.
-        if (disallowed.add(label)) {
-            allowed.remove(label);
-            dropped.remove(label);
-        }
+    void blacklist(EventLabel label) {
+        headerDeclarations.add(new BLOCK_HEADER(label, Action.FAIL));
     }
 
     // White-list events matched by this label.
-    void whitelist(SingleLabel label) {
-        // If an equivalent statement for this label exists, remove it.
-        if (allowed.add(label)) {
-            disallowed.remove(label);
-            dropped.remove(label);
-        }
+    void whitelist(EventLabel label) {
+        headerDeclarations.add(new BLOCK_HEADER(label, Action.HANDLE));
     }
 
     // Do not forward events matched by this label.
-    void drop(SingleLabel label) {
-        // If an equivalent statement for this label exists, remove it.
-        if (dropped.add(label)) {
-            disallowed.remove(label);
-            allowed.remove(label);
+    void drop(EventLabel label) {
+        headerDeclarations.add(new BLOCK_HEADER(label, Action.DROP));
+    }
+
+    Action getHeaderFor(EventSymbol eventSymbol) {
+        // Check block headers in LIFO order.
+        for (int i = headerDeclarations.size() - 1; i >= 0; i--) {
+            BLOCK_HEADER header = headerDeclarations.get(i);
+            if (header.event.match(eventSymbol)) {
+                return header.action;
+            }
         }
-    }
-
-    // Return true if this event symbol is white-listed by this Block.
-    boolean isWhitelisted(EventSymbol eventSymbol) {
-        return contains(allowed, eventSymbol);
-    }
-
-    // Return true if this event of this symbol should be dropped within this Block.
-    boolean isBlacklisted(EventSymbol eventSymbol) {
-        return contains(disallowed, eventSymbol);
-    }
-
-    // Return true if this event symbol is black-listed by this Block.
-    boolean isDropped(EventSymbol eventSymbol) {
-        return contains(dropped, eventSymbol);
-    }
-
-    // Return true if any of the provided labels matches this event symbol.
-    private boolean contains(Collection<SingleLabel> labels, EventSymbol eventSymbol) {
-        for (SingleLabel label : labels)
-            if (label.match(eventSymbol))
-                return true;
-
-        return false;
+        return null;
     }
 
     String status() {

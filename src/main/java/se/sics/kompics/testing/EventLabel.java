@@ -122,7 +122,7 @@ class EventLabel implements SingleLabel {
             // If yes, use it to determine equivalence.
             return eventMatchHelper(comparator, event, observed);
         } else {
-            // Otherwsie default to equals method.
+            // Otherwise default to equals method.
             return event.equals(observed);
         }
     }
@@ -137,58 +137,6 @@ class EventLabel implements SingleLabel {
                && comp.compare((V) e1, (V) e2) == 0;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof EventLabel))
-            return false;
-
-        EventLabel other = (EventLabel) o;
-
-        // Both labels must expect an event on the same port and direction.
-        if (!getPort().equals(other.getPort())
-            || !getDirection().equals(other.getDirection()))
-            return false;
-
-        // No two predicate labels are equal.
-        else if (isPredicateLabel && other.isPredicateLabel)
-            return this == other;
-
-        // Are both event labels?
-        else if (!isPredicateLabel && !other.isPredicateLabel)
-            return areEqualEventLabels(this, other);
-
-        // One is a predicate label, the other is an event label.
-        else return areEqualLabels(this, other);
-    }
-
-    // Return true if both event labels are equal.
-    private boolean areEqualEventLabels(EventLabel l1, EventLabel l2) {
-        // Both events must be of the same class
-        if (l1.event.getClass() != l2.event.getClass())
-            return false;
-
-        // If no comparator was registered for events of this type, default
-        // to using equals method.
-        if (l1.getComparator() == null)
-            return l1.event.equals(l2.event);
-
-        // A comparator was registered for events of this type, so use it.
-        return l1.getComparator().equals(l2);
-    }
-
-    // Return true if predicateLabel is equal to eventLabel
-    private boolean areEqualLabels(EventLabel predicateLabel,
-                                   EventLabel eventLabel) {
-        assert predicateLabel.isPredicateLabel;
-        assert !eventLabel.isPredicateLabel;
-
-        // Both labels must expect events of the same type.
-        if (predicateLabel.eventType != eventLabel.getClass())
-            return false;
-
-        return predicateMatchHelper(predicateLabel.predicate, eventLabel.getEvent());
-    }
-
     // Return true if predicate matches event.
     @SuppressWarnings("unchecked")
     private <E extends KompicsEvent>
@@ -197,18 +145,9 @@ class EventLabel implements SingleLabel {
     }
 
     @Override
-    public int hashCode() {
-        int result = 31 * port.hashCode();
-        result = 31 * result + direction.hashCode();
-        return result;
-    }
-
-    @Override
     public String toString() {
-        return direction + " "
-               + (isPredicateLabel?
-                  "Predicate(" + eventType.getSimpleName() + ")"
-                  : event);
+        return String.format("%s %s", direction,
+               (isPredicateLabel? "Predicate(" + eventType.getSimpleName() + ")" : event));
     }
 
     KompicsEvent getEvent() {
@@ -221,10 +160,6 @@ class EventLabel implements SingleLabel {
 
     Direction getDirection() {
         return direction;
-    }
-
-    public Comparator<? extends KompicsEvent> getComparator() {
-        return comparator;
     }
 
     // Label that matches the epsilon symbol.

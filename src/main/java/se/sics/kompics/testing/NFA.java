@@ -170,7 +170,7 @@ class NFA {
         currentStates = new HashSet<State>(repeatMain.startState.eclosure());
 
         // LOGGING.
-        printNFA(repeatMain.startState, finalFA.startState);
+        //printNFA(repeatMain.startState, finalFA.startState);
     }
 
     // Return true if we are in the final state of the NFA.
@@ -309,8 +309,6 @@ class NFA {
                 assert t != null;
                 // add next state to reachable
                 nextStates.add(t.nextState);
-                //for (Transition t : transitions) {
-                //}
             }
         }
     }
@@ -446,7 +444,8 @@ class NFA {
     // with the event.
     private <E extends KompicsEvent>
     Action getDefaultActionHelper(KompicsEvent event,
-                                  Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>> match) {
+                                  Map.Entry<Class<? extends KompicsEvent>,
+																	Function<? extends KompicsEvent, Action>> match) {
         Function<E, Action> function = (Function<E, Action>) match.getValue();
         Action action = function.apply((E) event);
 
@@ -1041,30 +1040,25 @@ class NFA {
                          eventSymbol,
                          block.status());
 
-            // Is this event white-listed?
-            if (block.isWhitelisted(eventSymbol)) {
-                // If yes, forward it.
-                logger.trace("Forwarding event [{}]", eventSymbol);
-                return selfTransitionAndForward;
+            Action action = block.getHeaderFor(eventSymbol);
+            if (action == null) {
+                // We were not able to match the event.
+                return null;
             }
-
-            // Should we drop this event?
-            if (block.isDropped(eventSymbol)) {
-                // If yes, drop it.
-                logger.trace("Dropping event [{}]", eventSymbol);
-                return selfTransitionAndDrop;
+            switch (action) {
+                // Is this event white-listed?
+                case HANDLE:
+                    // If yes, forward it.
+                    logger.trace("Forwarding event [{}]", eventSymbol);
+                    return selfTransitionAndForward;
+                // Should we drop this event?
+                case DROP:
+                    logger.trace("Dropping event [{}]", eventSymbol);
+                    return selfTransitionAndDrop;
+                default:
+                    logger.error("Observed blacklisted event [{}]", eventSymbol);
+                    return ERROR_TRANSITION;
             }
-
-            // Is this event black-listed?
-            if (block.isBlacklisted(eventSymbol)) {
-                // If yes, fail the test case by transitioning to
-                // the error state.
-                logger.error("Observed blacklisted event [{}]", eventSymbol);
-                return ERROR_TRANSITION;
-            }
-
-            // We were not able to match the event.
-            return null;
         }
 
         /**
