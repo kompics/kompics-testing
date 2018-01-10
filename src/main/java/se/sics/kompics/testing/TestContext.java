@@ -24,7 +24,7 @@ package se.sics.kompics.testing;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-
+import java.util.Comparator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.Channel;
@@ -43,8 +43,6 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Scheduler;
 import se.sics.kompics.Start;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
-
-import java.util.Comparator;
 
 
 /**
@@ -891,11 +889,11 @@ public class TestContext<T extends ComponentDefinition> {
      * @param predicate inspect predicate
      * @return current {@link TestContext}.
      */
-    public TestContext<T> inspect(Predicate<T> predicate) {
-        checkNotNull(predicate);
-        ctrl.inspect(predicate);
-        return this;
-    }
+//    public TestContext<T> inspect(Predicate<T> predicate) {
+//        checkNotNull(predicate);
+//        ctrl.inspect(predicate);
+//        return this;
+//    }
 
     // ExpectFault.
 

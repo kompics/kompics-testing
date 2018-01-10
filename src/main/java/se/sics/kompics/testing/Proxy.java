@@ -21,6 +21,7 @@
 
 package se.sics.kompics.testing;
 
+import java.util.Map;
 import org.slf4j.Logger;
 import se.sics.kompics.ChannelFactory;
 import se.sics.kompics.Component;
@@ -35,12 +36,11 @@ import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Unsafe;
 import se.sics.kompics.testing.scheduler.CallingThreadScheduler;
-import java.util.Map;
 
 /**
  *  The parent component of the CUT and its external dependencies.
  */
-class Proxy<T extends ComponentDefinition> extends ComponentDefinition{
+class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
 
     // LOG.
     private Logger logger = TestContext.logger;

@@ -21,7 +21,6 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
@@ -403,53 +402,53 @@ public class ConditionalTest {
     assert tc.check();
   }
 
-  @Test
-  public void conditionalInspectEitherTest() {
-    tc.body();
-    tc.trigger(pong(0), pongerPort.getPair());
-    conditionalInspect();
-  }
+//  @Test
+//  public void conditionalInspectEitherTest() {
+//    tc.body();
+//    tc.trigger(pong(0), pongerPort.getPair());
+//    conditionalInspect();
+//  }
 
-  @Test
-  public void conditionalInspectOrTest() {
-    tc.body();
-    tc.trigger(pong(1), pongerPort.getPair());
-    conditionalInspect();
-  }
+//  @Test
+//  public void conditionalInspectOrTest() {
+//    tc.body();
+//    tc.trigger(pong(1), pongerPort.getPair());
+//    conditionalInspect();
+//  }
 
-  private void conditionalInspect() {
-    Pong pong = pong(2);
-    tc.either()
-        .expect(pong(0), pingerPort, IN)
-        .trigger(pong, pingerPort)
-        .trigger(pong, pingerPort)
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            System.out.println(pinger.pongsReceived);
-            return pinger.pongsReceived == 3;
-          }
-        })
-        .trigger(pong, pingerPort)
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            return pinger.pongsReceived == 4;
-          }
-        })
-    .or()
-        .expect(pong(1), pingerPort, IN)
-        .trigger(pong, pingerPort)
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            return pinger.pongsReceived == 2;
-          }
-        })
-    .end();
-
-    assert tc.check();
-  }
+//  private void conditionalInspect() {
+//    Pong pong = pong(2);
+//    tc.either()
+//        .expect(pong(0), pingerPort, IN)
+//        .trigger(pong, pingerPort)
+//        .trigger(pong, pingerPort)
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            System.out.println(pinger.pongsReceived);
+//            return pinger.pongsReceived == 3;
+//          }
+//        })
+//        .trigger(pong, pingerPort)
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            return pinger.pongsReceived == 4;
+//          }
+//        })
+//    .or()
+//        .expect(pong(1), pingerPort, IN)
+//        .trigger(pong, pingerPort)
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            return pinger.pongsReceived == 2;
+//          }
+//        })
+//    .end();
+//
+//    assert tc.check();
+//  }
 
   @Test
   public void conditionalRepeatTest() {

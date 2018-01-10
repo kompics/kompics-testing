@@ -20,10 +20,6 @@
  */
 package se.sics.kompics.testing;
 
-import com.google.common.base.Predicate;
-import org.junit.Before;
-import org.junit.Test;
-import se.sics.kompics.Component;
 import se.sics.kompics.Negative;
 
 public class InspectTest extends TestHelper{
@@ -33,81 +29,81 @@ public class InspectTest extends TestHelper{
   private Counter counter;
   private Pong pong = pong(0);
 
-  @Before
-  public void init() {
-    counter = new Counter();
-    tc = TestContext.newInstance(Pinger.class, new PingerInit(counter));
-    Component pinger = tc.getComponentUnderTest();
-    pingerPort = pinger.getNegative(PingPongPort.class);
-  }
-
-  @Test
-  public void singleTest() {
-    tc.body()
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            counter.count++;
-            return true;
-          }
-        })
-    ;
-    assert tc.check();
-    assert counter.count == 1;
-  }
-
-  @Test
-  public void withTriggerTest() {
-    tc.body()
-        .trigger(pong, pingerPort)
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            return pinger.pongsReceived.count == 1;
-          }
-        });
-
-    assert tc.check();
-  }
-
-  @Test
-  public void repeatTest() {
-    final int N = 3;
-    final Counter timesRun = new Counter();
-    tc.body()
-        .repeat(N).body()
-            .trigger(pong, pingerPort)
-            .inspect(new Predicate<Pinger>() {
-              @Override
-              public boolean apply(Pinger pinger) {
-                timesRun.count++;
-                return true;
-              }
-            })
-        .end()
-
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            return pinger.pongsReceived.count == N;
-          }
-        })
-    ;
-
-    assert tc.check();
-    assert timesRun.count == N;
-  }
-
-  @Test
-  public void failTest() {
-    tc.body()
-        .inspect(new Predicate<Pinger>() {
-          @Override
-          public boolean apply(Pinger pinger) {
-            return false;
-          }
-        });
-
-    assert !tc.check();
-  }
+//  @Before
+//  public void init() {
+//    counter = new Counter();
+//    tc = TestContext.newInstance(Pinger.class, new PingerInit(counter));
+//    Component pinger = tc.getComponentUnderTest();
+//    pingerPort = pinger.getNegative(PingPongPort.class);
+//  }
+//
+//  @Test
+//  public void singleTest() {
+//    tc.body()
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            counter.count++;
+//            return true;
+//          }
+//        })
+//    ;
+//    assert tc.check();
+//    assert counter.count == 1;
+//  }
+//
+//  @Test
+//  public void withTriggerTest() {
+//    tc.body()
+//        .trigger(pong, pingerPort)
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            return pinger.pongsReceived.count == 1;
+//          }
+//        });
+//
+//    assert tc.check();
+//  }
+//
+//  @Test
+//  public void repeatTest() {
+//    final int N = 3;
+//    final Counter timesRun = new Counter();
+//    tc.body()
+//        .repeat(N).body()
+//            .trigger(pong, pingerPort)
+//            .inspect(new Predicate<Pinger>() {
+//              @Override
+//              public boolean apply(Pinger pinger) {
+//                timesRun.count++;
+//                return true;
+//              }
+//            })
+//        .end()
+//
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            return pinger.pongsReceived.count == N;
+//          }
+//        })
+//    ;
+//
+//    assert tc.check();
+//    assert timesRun.count == N;
+//  }
+//
+//  @Test
+//  public void failTest() {
+//    tc.body()
+//        .inspect(new Predicate<Pinger>() {
+//          @Override
+//          public boolean apply(Pinger pinger) {
+//            return false;
+//          }
+//        });
+//
+//    assert !tc.check();
+//  }
 }
