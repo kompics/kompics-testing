@@ -116,7 +116,7 @@ class InternalLabel implements Label {
     // Trigger an event on the specified port.
     private String doTrigger() {
         // Were we provided with an event to trigger?
-        if (event == null) {
+        if (event == null || future != null) {
             // If no, get event from provided future.
             event = future.get();
             if (event == null) {
