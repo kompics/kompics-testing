@@ -22,6 +22,7 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.JavaComponent;
@@ -59,11 +60,12 @@ class InternalLabel implements Label {
     // If ACTION is INSPECT, this predicate is invoked.
     private Predicate<? extends ComponentDefinition> inspectPredicate;
 
-    // If ACTION is TRIGGER and this event will be triggered if non-null.
+    // If ACTION is TRIGGER then this event will be triggered if non-null.
     private KompicsEvent event;
 
-    // If ACTION is TRIGGER and event is null, an event is retrieved by
-    // invoking this Future.
+    // If ACTION is TRIGGER and a supplier or future was provided, then it will be
+    // queried for an event.
+    private Supplier<? extends KompicsEvent> supplier;
     private Future<? extends KompicsEvent, ? extends KompicsEvent> future;
 
     // The port on which we trigger an event when performing a TRIGGER action.
@@ -82,6 +84,13 @@ class InternalLabel implements Label {
     // Create a Trigger Label - Trigger the provided event.
     InternalLabel(KompicsEvent event, Port<? extends PortType> port) {
         this.event = event;
+        this.port = port;
+        ACTION = InternalAction.TRIGGER;
+    }
+
+    // Create a Trigger Label - Trigger the event provided by supplier.
+    InternalLabel(Supplier<? extends KompicsEvent> supplier, Port<? extends PortType> port) {
+        this.supplier = supplier;
         this.port = port;
         ACTION = InternalAction.TRIGGER;
     }
@@ -115,20 +124,30 @@ class InternalLabel implements Label {
 
     // Trigger an event on the specified port.
     private String doTrigger() {
-        // Were we provided with an event to trigger?
-        if (event == null || future != null) {
-            // If no, get event from provided future.
-            event = future.get();
-            if (event == null) {
+        // Retrieve the event to trigger.
+        KompicsEvent ev;
+        // Were we provided with an event object to trigger?
+        if (event != null) {
+            ev = event;
+        } else {
+            // If no, get event from provided supplier or future.
+            Object producer = null;
+            if (supplier != null) {
+                ev = supplier.get();
+                producer = supplier;
+            } else {
+                ev = future.get();
+                producer = future;
+            }
+            if (ev == null) {
                 // Return error message.
-                return String.format("Future %s returned null", future);
+                return String.format("[%s].get() returned null", producer);
             }
         }
-
-        logger.trace("triggered({})\t", event);
+        logger.trace("triggered({})\t", ev);
 
         // Finally, trigger the event.
-        port.doTrigger(event, 0, port.getOwner());
+        port.doTrigger(ev, 0, port.getOwner());
         return null;
     }
 

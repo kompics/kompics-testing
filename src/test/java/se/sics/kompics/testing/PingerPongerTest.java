@@ -22,6 +22,7 @@ package se.sics.kompics.testing;
 
 import com.google.common.base.Function;
 
+import com.google.common.base.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import static junit.framework.Assert.assertEquals;
@@ -37,6 +38,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Request;
 import se.sics.kompics.Start;
 
+import static org.junit.Assert.assertTrue;
 import static se.sics.kompics.testing.Direction.OUT;
 
 public class PingerPongerTest {
@@ -59,6 +61,31 @@ public class PingerPongerTest {
       counter.i++;
     }
   };
+
+  @Test
+  public void triggerWithSupplierTest() {
+    int M = 5;
+    Supplier<Ping> supplier = new Supplier<Ping>() {
+      int i;
+      @Override
+      public Ping get() {
+        counter.i++;
+        return new Ping(++i);
+      }
+    };
+    tc.connect(pingerPort, pongerPort).body()
+        .repeat(M)
+        .body()
+            .trigger(supplier, pingerPort.getPair())
+        .end();
+
+    for (int i = 1; i <= M; i++) {
+      tc.expect(new Ping(i), pingerPort, OUT);
+    }
+
+    assertTrue(tc.check());
+    assertEquals(counter.i, M);
+  }
 
   @Test
   public void entryFunctionTest() {
