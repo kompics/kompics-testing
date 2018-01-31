@@ -35,6 +35,7 @@ import java.util.Stack;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 
 import se.sics.kompics.Component;
@@ -382,10 +383,21 @@ class Ctrl<T extends ComponentDefinition> {
         table.addLabel(label);
     }
 
+    // Add a TRIGGER statement to the NFA.
+    void trigger(Supplier<? extends KompicsEvent> supplier, Port<? extends PortType> port) {
+        // Verify allowed modes for this statement.
+        assertMode(BODY, CONDITIONAL);
+
+        // Create a TRIGGER transition label.
+        InternalLabel label = new InternalLabel(supplier, port);
+
+        // Add it to NFA.
+        table.addLabel(label);
+    }
     // Add a TRIGGER internal transition to the NFA.
     // The triggered event is retrieved by calling future.
     <E extends KompicsEvent, R extends KompicsEvent, P extends PortType>
-    void trigger(Port<P> responsePort, Future<E, R> future) {
+    void trigger(Future<E, R> future, Port<P> responsePort) {
         // Verify allowed modes for this statement.
         assertMode(BODY, CONDITIONAL);
 

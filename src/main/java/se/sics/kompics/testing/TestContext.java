@@ -25,6 +25,8 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import java.util.Comparator;
+
+import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.sics.kompics.Channel;
@@ -432,6 +434,21 @@ public class TestContext<T extends ComponentDefinition> {
     }
 
     /**
+     * Trigger an event provided by the supplier's {@link com.google.common.base.Supplier#get()} method on the specified port.
+     * <p>Modes - {@link MODE#BODY BODY}, {@link MODE#CONDITIONAL CONDITIONAL}.</p>
+     * @param supplier supplier to be invoked.
+     * @param port     port on which to trigger event.
+     * @param <P>      port type.
+     * @return         current {@link TestContext}.
+     */
+    public <P extends PortType> TestContext<T> trigger(Supplier<? extends KompicsEvent> supplier,
+                                                       Port<P> port) {
+        checkNotNull(supplier, port);
+        ctrl.trigger(supplier, port);
+        return this;
+    }
+
+    /**
      * Trigger the event provided by future as a response on specified port.
      * The future must have been {@link Future#set(KompicsEvent) set}in a previous call to {@link #answerRequest(Class, Port, Future)}.
      * The {@link Future#get()} method is called to retrieve the triggered event.
@@ -447,7 +464,7 @@ public class TestContext<T extends ComponentDefinition> {
     TestContext<T> trigger(Future<RQ, RS> future,
                            Port<P> responsePort) {
         checkNotNull(responsePort, future);
-        ctrl.trigger(responsePort, future);
+        ctrl.trigger(future, responsePort);
         return this;
     }
 
