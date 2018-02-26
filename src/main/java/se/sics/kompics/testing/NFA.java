@@ -36,6 +36,9 @@ import java.util.Set;
 import java.util.Stack;
 
 class NFA {
+    // Log.
+    private Logger logger = TestContext.logger;
+
     // Next available ID for a new state.
     private int stateId = 1;
 
@@ -43,23 +46,24 @@ class NFA {
     private final List<Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>> defaultActions =
         new ArrayList<Map.Entry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>>();
 
-    // The Main RepeatFA within which the entire test case is executed.
-    private RepeatFA repeatMain;
-
-    // The current states of this NFA.
-    private Set<State> currentStates = new HashSet<State>();
+    // The Main Repeat Block within which all
+    // statements in the test case are run (and blocks are nested).
+    private Block mainBlock = new Block(null, 1);
 
     // The error state of this NFA.
-    private final State errorState;
+    private final State errorState = new State(0, mainBlock);
 
     // The Transition leading to the error state.
-    private final Transition ERROR_TRANSITION;
+    private final Transition ERROR_TRANSITION = new Transition(null, errorState);
 
-    // Log.
-    private Logger logger = TestContext.logger;
+    // The current states of this NFA.
+    private Set<State> currentStates;
 
     // The FA to which we are currently adding state transitions.
     private FA currentFA;
+
+    // The Main RepeatFA within which the entire test case is executed.
+    private RepeatFA repeatMain = new RepeatFA(1, mainBlock);
 
     // Track nested automata while adding state transitions.
     private Stack<FA> previousFA = new Stack<FA>();
@@ -69,39 +73,22 @@ class NFA {
     // the set of currentStates.
     private HashSet<Block> activeBlocks = new HashSet<Block>();
 
-    NFA(Block initialBlock) {
-        // Create Main RepeatFA.
-        repeatMain = new RepeatFA(1, initialBlock);
+    public NFA() {
         currentFA = repeatMain;
         previousFA.push(repeatMain);
-
-        // Create Error State and Transition.
-        errorState = new State(0, initialBlock);
-        ERROR_TRANSITION = new Transition(null, errorState);
     }
 
-    // Return and increment next available ID for a new state.
-    private int nextId() {
-        return stateId++;
-    }
-
-    // Register a default action for unmatched events of subtype eventType.
-    // Given an unmatched event e of class C, the predicate registered for
-    // the type T that is a subtype of C and closest to C in
-    // the subtype hierarchy is used.
-    <E extends KompicsEvent>
-    void registerDefaultAction(Class<E> eventType,
-                               Function<E, Action> predicate) {
-        defaultActions.add(new AbstractMap.SimpleImmutableEntry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventType, predicate));
+    public Block getMainBlock() {
+        return mainBlock;
     }
 
     // Add this transition label as a child of the current FA.
-    void addLabel(Label label) {
+    public void addLabel(Label label) {
         currentFA.createAndAddTransition(label);
     }
 
-    // Create block and set as the current FA.
-    void addRepeat(int count, Block block) {
+    // Create Repeat/Kleene block and set as the current FA.
+    public void addRepeat(int count, Block block) {
         if (count == Block.STAR) {
             currentFA = new KleeneFA(block);
         } else {
@@ -112,7 +99,7 @@ class NFA {
     }
 
     // Close the current block/conditional statement's automaton.
-    void end() {
+    public void end() {
         // Pop currentFA from the FA stack.
         FA child = previousFA.pop();
         assert child == currentFA;
@@ -121,8 +108,9 @@ class NFA {
         // and is not closed until all transitions have been added.
         // So, if it was popped, then there must be mis-matched end statement.
         // is the test specification.
-        if (previousFA.isEmpty())
+        if (previousFA.isEmpty()) {
             throw new IllegalStateException("no matching statement for end.");
+        }
 
         // Close currentFA.
         currentFA.end();
@@ -135,14 +123,14 @@ class NFA {
     }
 
     // Begin a new conditional statement.
-    void either(Block block) {
+    public void either(Block block) {
         currentFA = new ConditionalFA(block);
         // Remember enclosing FA.
         previousFA.push(currentFA);
     }
 
     // Switch from 'either' to 'or' mode in a conditional statement.
-    void or() {
+    public void or() {
         if (!(currentFA instanceof ConditionalFA)) {
             throw new IllegalStateException("Not in conditional mode");
         }
@@ -150,7 +138,11 @@ class NFA {
     }
 
     // Construct the NFA.
-    void construct() {
+    public void construct() {
+        if (currentStates != null) {
+            throw new IllegalStateException("NFA has already been constructed");
+        }
+
         assert repeatMain == currentFA;
         assert repeatMain == previousFA.pop();
         assert previousFA.isEmpty();
@@ -170,6 +162,21 @@ class NFA {
 
         // LOGGING.
         //printNFA(repeatMain.startState, finalFA.startState);
+    }
+
+    // Register a default action for unmatched events of subtype eventType.
+    // Given an unmatched event e of class C, the predicate registered for
+    // the type T that is a subtype of C and closest to C in
+    // the subtype hierarchy is used.
+    <E extends KompicsEvent>
+    void setDefaultAction(Class<E> eventType,
+                          Function<E, Action> predicate) {
+        defaultActions.add(new AbstractMap.SimpleImmutableEntry<Class<? extends KompicsEvent>, Function<? extends KompicsEvent, Action>>(eventType, predicate));
+    }
+
+    // Return and increment next available ID for a new state.
+    private int nextId() {
+        return stateId++;
     }
 
     // Return true if we are in the final state of the NFA.

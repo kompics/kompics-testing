@@ -31,9 +31,9 @@ import se.sics.kompics.PortType;
  * A state transition label in the NFA that matches a single
  * input event symbol using an equivalent event instance or
  * predicate.
- * @see Ctrl#createEventLabel(KompicsEvent, Port, Direction)
- * @see Ctrl#createPredicateLabel(Class, Port, Direction)
- * @see Ctrl#createPredicateLabel(Class, Predicate, Port, Direction)
+ * @see NFABuilder#createEventLabel(KompicsEvent, Port, Direction)
+ * @see NFABuilder#createPredicateLabel(Class, Port, Direction)
+ * @see NFABuilder#createPredicateLabel(Class, Predicate, Port, Direction)
  *
  * A default Event Label is created if a {@link se.sics.kompics.KompicsEvent}
  * instance e is provided by the expect statement from which this label

@@ -38,20 +38,13 @@ import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Init;
-import se.sics.kompics.Kompics;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
-import se.sics.kompics.Scheduler;
-import se.sics.kompics.Tracer;
 import se.sics.kompics.Unsafe;
-import se.sics.kompics.scheduler.ThreadPoolScheduler;
-import se.sics.kompics.testing.scheduler.CallingThreadScheduler;
-
-import static se.sics.kompics.testing.Direction.IN;
 
 /**
  * @author Ifeanyi Ubah
@@ -68,16 +61,14 @@ public class TestContext<T extends ComponentDefinition> {
     // The component under test.
     private T cut;
 
-    // Validate a test specification and create NFA.
-    private Ctrl<T> ctrl = new Ctrl<T>();
-
-    // The Components' scheduler for handling events.
-    private Scheduler scheduler;
-
     /**
      * Timeout value in milliseconds - Default 400ms
      */
     public static final long timeout = 400;
+
+    private final NFABuilder builder = new NFABuilder();
+
+    private final Simulator simulator = new Simulator();
 
     // Create a new test case for the component with the provided
     // definition and initialize it with initEvent.
@@ -85,36 +76,18 @@ public class TestContext<T extends ComponentDefinition> {
     private TestContext(Init<? extends ComponentDefinition> initEvent,
                         Class<T> definition) {
         // Initialize proxy and test case scheduler.
-        proxy = new Proxy<T>(ctrl);
-
-        // Use CallingThreadScheduler for proxy and the default
-        // scheduler for all other components.
+        proxy = new Proxy<T>(simulator);
         ComponentCore proxyComponent = proxy.getComponentCore();
-        proxyComponent.setScheduler(new CallingThreadScheduler());
-        scheduler = new ThreadPoolScheduler(1);
-        Kompics.setScheduler(scheduler);
-
-        // Create CUT with Init and tracer.
-        Tracer t = new Tracer() {
-            @Override
-            public boolean triggeredOutgoing(KompicsEvent event, PortCore<?> port) {
-                return ctrl.doTransition(event, port, Direction.OUT);
-            }
-
-            @Override
-            public boolean triggeredIncoming(KompicsEvent event, PortCore<?> port) {
-                return ctrl.doTransition(event, port, IN);
-            }
-        };
 
         if (initEvent == Init.NONE) {
-            cut = proxy.createComponentUnderTest(definition, (Init.None) initEvent, t);
+            cut = proxy.createComponentUnderTest(definition, (Init.None) initEvent);
         } else {
-            cut = proxy.createComponentUnderTest(definition, (Init<T>) initEvent, t);
+            cut = proxy.createComponentUnderTest(definition, (Init<T>) initEvent);
         }
 
-        ctrl.setProxyComponent(proxyComponent);
-        ctrl.setDefinitionUnderTest(cut);
+        builder.setProxyComponent(proxyComponent);
+        simulator.setNfa(builder.getNfa());
+        simulator.setProxyComponent(proxyComponent);
     }
 
     // Create a new testcase with the CUT's init set to initEvent.
@@ -180,7 +153,7 @@ public class TestContext<T extends ComponentDefinition> {
         Component c = proxy.createDependency(componentDefinition, init);
 
         // Check that we are in the initial header.
-        ctrl.checkInInitialHeader();
+        builder.checkInInitialHeader();
         return c;
     }
 
@@ -207,7 +180,7 @@ public class TestContext<T extends ComponentDefinition> {
         Component c = proxy.createDependency(componentDefinition, init);
 
         // Check that we are in the initial header.
-        ctrl.checkInInitialHeader();
+        builder.checkInInitialHeader();
         return c;
     }
 
@@ -257,7 +230,7 @@ public class TestContext<T extends ComponentDefinition> {
         checkNotNull(positive, negative, factory);
 
         // Verify allowed mode for this statement.
-        ctrl.checkInInitialHeader();
+        builder.checkInInitialHeader();
 
         factory.connect((PortCore<P>) positive, (PortCore<P>) negative);
 
@@ -274,7 +247,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> repeat(int times) {
-        ctrl.repeat(times);
+        builder.repeat(times);
         return this;
     }
 
@@ -285,7 +258,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> repeat() {
-        ctrl.repeat();
+        builder.repeat();
         return this;
     }
 
@@ -300,7 +273,7 @@ public class TestContext<T extends ComponentDefinition> {
      */
     public TestContext<T> repeat(int times, EntryFunction entryFunction) {
         checkNotNull(entryFunction);
-        ctrl.repeat(times, entryFunction);
+        builder.repeat(times, entryFunction);
         return this;
     }
 
@@ -314,7 +287,7 @@ public class TestContext<T extends ComponentDefinition> {
      */
     public TestContext<T> repeat(EntryFunction entryFunction) {
         checkNotNull(entryFunction);
-        ctrl.repeat(entryFunction);
+        builder.repeat(entryFunction);
         return this;
     }
 
@@ -326,7 +299,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> body() {
-        ctrl.body();
+        builder.body();
         return this;
     }
 
@@ -340,7 +313,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> end() {
-        ctrl.end();
+        builder.end();
         return this;
     }
 
@@ -365,7 +338,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that expect statement is valid.
         checkValidPort(event.getClass(), port, direction);
 
-        ctrl.expect(ctrl.createEventLabel(event, port, direction));
+        builder.expect(builder.createEventLabel(event, port, direction));
         return this;
     }
 
@@ -391,8 +364,8 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that expect statement is valid.
         checkValidPort(eventType, port, direction);
 
-        ctrl.expect(
-            ctrl.createPredicateLabel(eventType, predicate, port, direction));
+        builder.expect(
+            builder.createPredicateLabel(eventType, predicate, port, direction));
 
         return this;
     }
@@ -416,7 +389,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.expect(ctrl.createPredicateLabel(eventType, port, direction));
+        builder.expect(builder.createPredicateLabel(eventType, port, direction));
         return this;
     }
 
@@ -433,7 +406,7 @@ public class TestContext<T extends ComponentDefinition> {
     public <P extends PortType> TestContext<T> trigger(KompicsEvent event,
                                                        Port<P> port) {
         checkNotNull(event, port);
-        ctrl.trigger(event, port);
+        builder.trigger(event, port);
         return this;
     }
 
@@ -448,7 +421,7 @@ public class TestContext<T extends ComponentDefinition> {
     public <P extends PortType> TestContext<T> trigger(Supplier<? extends KompicsEvent> supplier,
                                                        Port<P> port) {
         checkNotNull(supplier, port);
-        ctrl.trigger(supplier, port);
+        builder.trigger(supplier, port);
         return this;
     }
 
@@ -468,7 +441,7 @@ public class TestContext<T extends ComponentDefinition> {
     TestContext<T> trigger(Future<RQ, RS> future,
                            Port<P> responsePort) {
         checkNotNull(responsePort, future);
-        ctrl.trigger(future, responsePort);
+        builder.trigger(future, responsePort);
         return this;
     }
 
@@ -479,7 +452,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> unordered() {
-        ctrl.setUnorderedMode();
+        builder.setUnorderedMode();
         return this;
     }
 
@@ -503,7 +476,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return   current {@link TestContext}.
      */
     public TestContext<T> unordered(boolean immediateResponse) {
-        ctrl.setUnorderedMode(immediateResponse);
+        builder.setUnorderedMode(immediateResponse);
         return this;
     }
 
@@ -528,7 +501,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(event.getClass(), port, direction);
 
-        ctrl.blockExpect(ctrl.createEventLabel(event, port, direction));
+        builder.blockExpect(builder.createEventLabel(event, port, direction));
         return this;
     }
 
@@ -546,7 +519,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.blockExpect(ctrl.createPredicateLabel(eventType,
+        builder.blockExpect(builder.createPredicateLabel(eventType,
                                                    pred,
                                                    port,
                                                    direction));
@@ -566,7 +539,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.blockExpect(ctrl.createPredicateLabel(eventType, port, direction));
+        builder.blockExpect(builder.createPredicateLabel(eventType, port, direction));
         return this;
     }
 
@@ -580,7 +553,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> answerRequests() {
-        ctrl.answerRequests();
+        builder.answerRequests();
         return this;
     }
 
@@ -613,7 +586,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(requestType, requestPort, Direction.OUT);
 
-        ctrl.answerRequest(requestType, requestPort.getPair(), mapper, responsePort);
+        builder.answerRequest(requestType, requestPort.getPair(), mapper, responsePort);
         return this;
     }
 
@@ -641,7 +614,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(requestType, requestPort, Direction.OUT);
 
-        ctrl.answerRequest(requestType, requestPort.getPair(), future);
+        builder.answerRequest(requestType, requestPort.getPair(), future);
         return this;
     }
 
@@ -659,7 +632,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return  current {@link TestContext}.
      */
     public TestContext<T> either() {
-        ctrl.either();
+        builder.either();
         return this;
     }
 
@@ -670,7 +643,7 @@ public class TestContext<T extends ComponentDefinition> {
      * @return  current {@link TestContext}.
      */
     public TestContext<T> or() {
-        ctrl.or();
+        builder.or();
         return this;
     }
 
@@ -695,7 +668,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(event.getClass(), port, direction);
 
-        ctrl.blacklist(ctrl.createEventLabel(event, port, direction));
+        builder.blacklist(builder.createEventLabel(event, port, direction));
         return this;
     }
 
@@ -713,7 +686,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.blacklist(ctrl.createPredicateLabel(eventType, predicate, port, direction));
+        builder.blacklist(builder.createPredicateLabel(eventType, predicate, port, direction));
         return this;
     }
 
@@ -730,7 +703,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.blacklist(ctrl.createPredicateLabel(eventType, port, direction));
+        builder.blacklist(builder.createPredicateLabel(eventType, port, direction));
         return this;
     }
 
@@ -755,7 +728,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(event.getClass(), port, direction);
 
-        ctrl.whitelist(ctrl.createEventLabel(event, port, direction));
+        builder.whitelist(builder.createEventLabel(event, port, direction));
         return this;
     }
 
@@ -773,7 +746,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.whitelist(ctrl.createPredicateLabel(eventType, predicate, port, direction));
+        builder.whitelist(builder.createPredicateLabel(eventType, predicate, port, direction));
         return this;
     }
 
@@ -790,7 +763,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.whitelist(ctrl.createPredicateLabel(eventType, port, direction));
+        builder.whitelist(builder.createPredicateLabel(eventType, port, direction));
         return this;
     }
 
@@ -815,7 +788,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(event.getClass(), port, direction);
 
-        ctrl.drop(ctrl.createEventLabel(event, port, direction));
+        builder.drop(builder.createEventLabel(event, port, direction));
         return this;
     }
 
@@ -833,7 +806,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.drop(ctrl.createPredicateLabel(eventType, predicate, port, direction));
+        builder.drop(builder.createPredicateLabel(eventType, predicate, port, direction));
         return this;
     }
 
@@ -850,7 +823,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(eventType, port, direction);
 
-        ctrl.drop(ctrl.createPredicateLabel(eventType, port, direction));
+        builder.drop(builder.createPredicateLabel(eventType, port, direction));
         return this;
     }
 
@@ -868,7 +841,7 @@ public class TestContext<T extends ComponentDefinition> {
     TestContext<T> setComparator(Class<E> eventType,
                                  Comparator<E> comparator) {
         checkNotNull(eventType, comparator);
-        ctrl.setComparator(eventType, comparator);
+        builder.setComparator(eventType, comparator);
         return this;
     }
 
@@ -887,7 +860,7 @@ public class TestContext<T extends ComponentDefinition> {
     TestContext<T> setDefaultAction(Class<E> eventType,
                                     Function<E, Action> function) {
         checkNotNull(eventType, function);
-        ctrl.setDefaultAction(eventType, function);
+        builder.setDefaultAction(eventType, function);
         return this;
     }
 
@@ -928,7 +901,7 @@ public class TestContext<T extends ComponentDefinition> {
     public TestContext<T> expectFault(Class<? extends Throwable> exceptionType) {
         checkNotNull(exceptionType);
         FaultLabel label = new FaultLabel(cut.getControlPort(), exceptionType);
-        ctrl.expectFault(label);
+        builder.expectFault(label);
         return this;
     }
 
@@ -939,7 +912,7 @@ public class TestContext<T extends ComponentDefinition> {
     public TestContext<T> expectFault(Predicate<Throwable> exceptionPredicate) {
         checkNotNull(exceptionPredicate);
         FaultLabel label = new FaultLabel(cut.getControlPort(), exceptionPredicate);
-        ctrl.expectFault(label);
+        builder.expectFault(label);
         return this;
     }
 
@@ -950,7 +923,8 @@ public class TestContext<T extends ComponentDefinition> {
      * @return current {@link TestContext}.
      */
     public TestContext<T> setTimeout(long timeoutMS) {
-        ctrl.setTimeout(timeoutMS);
+        builder.checkInInitialHeader();
+        simulator.setTimeout(timeoutMS);
         return this;
     }
 
@@ -961,13 +935,14 @@ public class TestContext<T extends ComponentDefinition> {
      */
     public boolean check() {
         try {
-            return ctrl.runFSM().get();
+            builder.constructNFA();
+            return simulator.run().get();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } finally {
-            scheduler.shutdown();
+            proxy.shutdown();
         }
     }
 
@@ -1012,7 +987,7 @@ public class TestContext<T extends ComponentDefinition> {
         if (isProvidedPort) {
             // If yes, Negative events are incoming to P while
             // Positive events are outgoing from P.
-            if (direction == IN) {
+            if (direction == Direction.IN) {
                 allowedTypes = Unsafe.getNegativeEvents(portType);
             } else {
                 allowedTypes = Unsafe.getPositiveEvents(portType);
@@ -1020,7 +995,7 @@ public class TestContext<T extends ComponentDefinition> {
         } else {
             // Otherwise, Positive events are incoming to P while
             // Negative events are outgoing from P.
-            if (direction == IN) {
+            if (direction == Direction.IN) {
                 allowedTypes = Unsafe.getPositiveEvents(portType);
             } else {
                 allowedTypes = Unsafe.getNegativeEvents(portType);

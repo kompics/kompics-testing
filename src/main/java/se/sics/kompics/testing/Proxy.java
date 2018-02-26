@@ -29,7 +29,12 @@ import se.sics.kompics.Fault;
 import se.sics.kompics.FaultHandler;
 import se.sics.kompics.Init;
 import se.sics.kompics.Kompics;
+import se.sics.kompics.KompicsEvent;
+import se.sics.kompics.PortCore;
+import se.sics.kompics.Scheduler;
 import se.sics.kompics.Tracer;
+import se.sics.kompics.scheduler.ThreadPoolScheduler;
+import se.sics.kompics.testing.scheduler.CallingThreadScheduler;
 
 /**
  *  The parent component of the CUT and its external dependencies.
@@ -41,34 +46,43 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
     // The component under test.
     private Component cut;
 
+    // The Components' scheduler for handling events.
+    private Scheduler scheduler;
+
     // The CUT definition.
     private T definitionUnderTest;
 
-    private Ctrl ctrl;
+    private final Simulator simulator;
 
-    Proxy(Ctrl ctrl) {
-        this.ctrl = ctrl;
+    public Proxy(Simulator simulator) {
+        this.simulator = simulator;
+
+        // Use CallingThreadScheduler for proxy and the default
+        // scheduler for all other components.
+        getComponentCore().setScheduler(new CallingThreadScheduler());
+        scheduler = new ThreadPoolScheduler(1);
+        Kompics.setScheduler(scheduler);
     }
 
     // Create the CUT with the provided component definition and init.
-    T createComponentUnderTest(Class<T> definition, Init<T> initEvent, Tracer tracer) {
-        init(definition, initEvent, tracer);
+    public T createComponentUnderTest(Class<T> definition, Init<T> initEvent) {
+        init(definition, initEvent);
         return definitionUnderTest;
     }
 
     // Create the CUT with the provided component definition and init.
-    T createComponentUnderTest(Class<T> definition, Init.None initEvent, Tracer tracer) {
-        init(definition, initEvent, tracer);
+    public T createComponentUnderTest(Class<T> definition, Init.None initEvent) {
+        init(definition, initEvent);
         return definitionUnderTest;
     }
 
     // Return the CUT.
-    Component getComponentUnderTest() {
+    public Component getComponentUnderTest() {
         return cut;
     }
 
     // Create an external dependency component.
-    <T extends ComponentDefinition>
+    public <T extends ComponentDefinition>
     Component createDependency(Class<T> cClass, Init<T> initEvent) {
         Component c = create(cClass, initEvent);
         // Set the scheduler initially to null.
@@ -79,7 +93,7 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
     }
 
     // Create an external dependency component.
-    <T extends ComponentDefinition>
+    public <T extends ComponentDefinition>
     Component createDependency(Class<T> cClass, Init.None initEvent) {
         Component c = create(cClass, initEvent);
         // Set the scheduler initially to null.
@@ -87,6 +101,10 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
         // component receives its first event.
         c.getComponent().getComponentCore().setScheduler(null);
         return c;
+    }
+
+    public void shutdown() {
+        scheduler.shutdown();
     }
 
     // Set action to be taken when an exception is thrown
@@ -104,7 +122,7 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
     private Fault.ResolveAction processFault(Fault fault) {
         EventSymbol eventSymbol = new EventSymbol(fault, definitionUnderTest.getControlPort(), Direction.OUT);
         eventSymbol.setForwardEvent(false);
-        ctrl.doTransition(eventSymbol);
+        simulator.doTransition(eventSymbol);
 
         // We wouldn't know how to resolve the fault.
         return Fault.ResolveAction.IGNORE;
@@ -113,15 +131,27 @@ class Proxy<T extends ComponentDefinition> extends ComponentDefinition {
     // initialize proxy.
     @SuppressWarnings("unchecked")
     private void init(Class<T> definition,
-                      Init<? extends ComponentDefinition> initEvent,
-                      Tracer tracer) {
+                      Init<? extends ComponentDefinition> initEvent) {
+        // Create CUT with Init and tracer.
+        Tracer t = new Tracer() {
+            @Override
+            public boolean triggeredOutgoing(KompicsEvent event, PortCore<?> port) {
+                return simulator.doTransition(event, port, Direction.OUT);
+            }
+
+            @Override
+            public boolean triggeredIncoming(KompicsEvent event, PortCore<?> port) {
+                return simulator.doTransition(event, port, Direction.IN);
+            }
+        };
+
         // Have we already run this init before?
         if (definitionUnderTest != null) {
             // If yes, do nothing.
             return;
         }
 
-        ComponentCore.childTracer.set(tracer);
+        ComponentCore.childTracer.set(t);
 
         // Create the component under test as a child component.
         if (initEvent == Init.NONE) {
