@@ -25,10 +25,11 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import org.slf4j.Logger;
 import se.sics.kompics.ComponentDefinition;
-import se.sics.kompics.JavaComponent;
+import se.sics.kompics.Direct;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Port;
 import se.sics.kompics.PortType;
+import se.sics.kompics.Unsafe;
 
 /**
  * A state transition label that carries out some predetermined
@@ -144,7 +145,18 @@ class InternalLabel implements Label {
                 return String.format("[%s].get() returned null", producer);
             }
         }
-        logger.trace("triggered({})\t", ev);
+
+        // If this is a Direct.Request then we set the origin
+        // port in order to route its response back to us.
+        if (ev instanceof Direct.Request) {
+            Direct.Request<? extends Direct.Response> req =
+                (Direct.Request<? extends Direct.Response>) ev;
+            if (Unsafe.getOrigin(req) == null) {
+                Unsafe.setOrigin(req, port.getPair());
+            }
+        }
+
+        logger.debug("Triggered event [{}]\t", ev);
 
         // Finally, trigger the event.
         port.doTrigger(ev, 0, port.getOwner());
@@ -153,32 +165,7 @@ class InternalLabel implements Label {
 
     // Perform a component inspection.
     private String doInspect() {
-        logger.trace("Inspecting Component");
-        JavaComponent cut = (JavaComponent)
-                            definitionUnderTest.getComponentCore();
-
-        // Wait until all pending events have been handled by the CUT.
-        while (cut.workCount.get() > 0) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // Call the provided Predicate with the CUT.
-        boolean successful = inspectHelper(definitionUnderTest,
-                                           inspectPredicate);
-
-        return successful? null : "Component assertion failed";
-    }
-
-    // Call the provided Predicate with the CUT.
-    @SuppressWarnings("unchecked")
-    private <T extends ComponentDefinition>
-    boolean inspectHelper(ComponentDefinition definitionUnderTest,
-                          Predicate<T> inspectPredicate) {
-        return inspectPredicate.apply((T) definitionUnderTest);
+        throw new UnsupportedOperationException("Inspect");
     }
 
     @Override

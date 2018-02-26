@@ -21,6 +21,7 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import se.sics.kompics.Component;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class AnswerRequestsTest extends TestHelper{
 
@@ -63,6 +65,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void orderedReceiveAll() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(0), pingerPort.getPair())
@@ -79,7 +82,7 @@ public class AnswerRequestsTest extends TestHelper{
         .end()
     ;
 
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(4*N, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
     for (Integer i = 0; i < 4*N; i++) {
@@ -114,6 +117,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void orderedImmediate() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(0), pingerPort.getPair())
@@ -128,7 +132,7 @@ public class AnswerRequestsTest extends TestHelper{
         .end()
     ;
 
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(4*N, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
     for (Integer i = 0; i < 4*N; i++) {
@@ -139,6 +143,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void unorderedReceiveAll() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(2), pingerPort.getPair())
@@ -153,7 +158,7 @@ public class AnswerRequestsTest extends TestHelper{
         .end()
     ;
 
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(3*N, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
   }
@@ -161,6 +166,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void unorderedImmediate() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(2), pingerPort.getPair())
@@ -175,7 +181,7 @@ public class AnswerRequestsTest extends TestHelper{
         .end()
     ;
 
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(3*N, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
   }
@@ -200,6 +206,7 @@ public class AnswerRequestsTest extends TestHelper{
 
   @Test
   public void unorderedImmediateFailIfNotReceiveAllRequests() {
+    allowAllPongs(tc);
     tc.body()
         .trigger(ping(2), pingerPort.getPair())
         .trigger(ping(3), pingerPort.getPair())
@@ -257,6 +264,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void orderedFuture() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(1), pingerPort.getPair())
@@ -274,7 +282,7 @@ public class AnswerRequestsTest extends TestHelper{
 
         .end()
     ;
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(N * 3, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
   }
@@ -282,6 +290,7 @@ public class AnswerRequestsTest extends TestHelper{
   @Test
   public void unorderedFuture() {
     int N = 3;
+    allowAllPongs(tc);
     tc.body()
         .repeat(N).body()
             .trigger(ping(1), pingerPort.getPair())
@@ -299,7 +308,7 @@ public class AnswerRequestsTest extends TestHelper{
             .trigger(future3, pingerPort)
         .end()
     ;
-    assert tc.check();
+    assertTrue(tc.check());
     assertEquals(N * 3, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
   }
@@ -338,5 +347,16 @@ public class AnswerRequestsTest extends TestHelper{
     assert !tc.check();
     assertEquals(0, pongsReceived(pinger));
     assertEquals(0, pingsReceived(ponger));
+  }
+
+  private static Predicate<Pong> allowPong = new Predicate<Pong>() {
+    @Override
+    public boolean apply(Pong pong) {
+      return true;
+    }
+  };
+
+  private void allowAllPongs(TestContext tc) {
+    tc.allow(Pong.class, allowPong, pingerPort, Direction.IN);
   }
 }

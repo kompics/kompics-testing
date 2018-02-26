@@ -21,6 +21,7 @@
 package se.sics.kompics.testing;
 
 import com.google.common.base.Function;
+import com.google.common.base.Predicate;
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
@@ -250,7 +251,6 @@ public class ConditionalTest {
 
   @Test
   public void basicNestedLoopTest() {
-
     tc.body();
     tc.trigger(pong(3), pongerPort.getPair());
 
@@ -320,6 +320,7 @@ public class ConditionalTest {
 
   @Test
   public void conditionalExpectMapperTest() {
+    dropPong2and3(tc);
     tc.body().repeat(10).body()
         .trigger(ping(1), pingerPort.getPair())
         .trigger(ping(4), pingerPort.getPair())
@@ -334,6 +335,8 @@ public class ConditionalTest {
 
   @Test
   public void conditionalExpectFutureTest() {
+    dropPong2and3(tc);
+
     tc.body().repeat(10).body()
         .trigger(ping(1), pingerPort.getPair())
         .trigger(ping(6), pingerPort.getPair())
@@ -484,6 +487,15 @@ public class ConditionalTest {
     ;
 
     assert tc.check();
+  }
+
+  private void dropPong2and3(TestContext tc) {
+    tc.drop(Pong.class, new Predicate<Pong>() {
+      @Override
+      public boolean apply(Pong pong) {
+        return pong.count == 2 || pong.count == 3;
+      }
+    }, pingerPort, Direction.IN);
   }
 
   private PFuture future1 = new PFuture();

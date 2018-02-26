@@ -21,6 +21,8 @@
 package se.sics.kompics.testing;
 
 import static org.junit.Assert.assertTrue;
+import static se.sics.kompics.testing.Direction.IN;
+
 import org.junit.Test;
 import se.sics.kompics.Component;
 import se.sics.kompics.KompicsEvent;
@@ -41,12 +43,12 @@ public class TriggerWithContextTest {
     Component comp = tc.getComponentUnderTest();
     Port<APort> port = comp.getNegative(APort.class);
 
-    tc = tc.body();
-    tc = repeatedEvents(tc, port);
-    tc = repeatedEvents(tc, port);
-    tc = repeatedEvents(tc, port);
-    tc = repeatedEvents(tc, port);
-    tc = tc.repeat(1).body().end();
+    tc.body();
+    repeatedEvents(tc, port);
+    repeatedEvents(tc, port);
+    repeatedEvents(tc, port);
+    repeatedEvents(tc, port);
+    tc.repeat(1).body().end();
 
     assertTrue(tc.check());
   }
@@ -68,12 +70,15 @@ public class TriggerWithContextTest {
 
   private TestContext repeatedEvents(TestContext tc, Port port) {
     Future f = repeatedFuture();
+    EventA eventA = new EventA(10);
     return tc
-      .trigger(new EventA(10), port)
-      .answerRequest(EventB.class, port, f)
-      .repeat(AComp.COUNTER).body()
-      .trigger(f, port)
-      .end();
+        .trigger(eventA, port)
+        .expect(eventA, port, IN)
+        .answerRequest(EventB.class, port, f)
+        .repeat(AComp.COUNTER).body()
+            .trigger(f, port)
+            .expect(EventA.class, port, IN)
+        .end();
   }
 
   private Future repeatedFuture() {

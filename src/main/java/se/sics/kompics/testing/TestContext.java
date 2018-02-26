@@ -24,7 +24,10 @@ package se.sics.kompics.testing;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
+
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.concurrent.ExecutionException;
 
 import com.google.common.base.Supplier;
 import org.slf4j.Logger;
@@ -43,9 +46,12 @@ import se.sics.kompics.PortCore;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Scheduler;
-import se.sics.kompics.Start;
+import se.sics.kompics.Tracer;
+import se.sics.kompics.Unsafe;
 import se.sics.kompics.scheduler.ThreadPoolScheduler;
+import se.sics.kompics.testing.scheduler.CallingThreadScheduler;
 
+import static se.sics.kompics.testing.Direction.IN;
 
 /**
  * @author Ifeanyi Ubah
@@ -63,13 +69,10 @@ public class TestContext<T extends ComponentDefinition> {
     private T cut;
 
     // Validate a test specification and create NFA.
-    private Ctrl<T> ctrl;
+    private Ctrl<T> ctrl = new Ctrl<T>();
 
     // The Components' scheduler for handling events.
     private Scheduler scheduler;
-
-    // Set to true if this test case has been run.
-    private boolean RUN;
 
     /**
      * Timeout value in milliseconds - Default 400ms
@@ -81,23 +84,37 @@ public class TestContext<T extends ComponentDefinition> {
     @SuppressWarnings("unchecked")
     private TestContext(Init<? extends ComponentDefinition> initEvent,
                         Class<T> definition) {
-
         // Initialize proxy and test case scheduler.
-        init();
+        proxy = new Proxy<T>(ctrl);
 
-        // Create CUT with Init.
-        if (initEvent == Init.NONE)
-            cut = proxy.createComponentUnderTest(definition,
-                                                 (Init.None) initEvent);
-        else
-            cut = proxy.createComponentUnderTest(definition,
-                                                 (Init<T>) initEvent);
+        // Use CallingThreadScheduler for proxy and the default
+        // scheduler for all other components.
+        ComponentCore proxyComponent = proxy.getComponentCore();
+        proxyComponent.setScheduler(new CallingThreadScheduler());
+        scheduler = new ThreadPoolScheduler(1);
+        Kompics.setScheduler(scheduler);
 
-        // Initialize Ctrl.
-        ctrl = new Ctrl<T>(proxy, cut);
+        // Create CUT with Init and tracer.
+        Tracer t = new Tracer() {
+            @Override
+            public boolean triggeredOutgoing(KompicsEvent event, PortCore<?> port) {
+                return ctrl.doTransition(event, port, Direction.OUT);
+            }
 
-        //Add CUT as a dependency component.
-        ctrl.addDependency(cut.getComponentCore());
+            @Override
+            public boolean triggeredIncoming(KompicsEvent event, PortCore<?> port) {
+                return ctrl.doTransition(event, port, IN);
+            }
+        };
+
+        if (initEvent == Init.NONE) {
+            cut = proxy.createComponentUnderTest(definition, (Init.None) initEvent, t);
+        } else {
+            cut = proxy.createComponentUnderTest(definition, (Init<T>) initEvent, t);
+        }
+
+        ctrl.setProxyComponent(proxyComponent);
+        ctrl.setDefinitionUnderTest(cut);
     }
 
     // Create a new testcase with the CUT's init set to initEvent.
@@ -160,9 +177,10 @@ public class TestContext<T extends ComponentDefinition> {
     public <T extends ComponentDefinition>
     Component create(Class<T> componentDefinition, Init<T> init) {
         checkNotNull(componentDefinition, init);
-        Component c = proxy.createSetupComponent(componentDefinition, init);
-        // Add component as a dependency.
-        ctrl.addDependency(c);
+        Component c = proxy.createDependency(componentDefinition, init);
+
+        // Check that we are in the initial header.
+        ctrl.checkInInitialHeader();
         return c;
     }
 
@@ -186,9 +204,10 @@ public class TestContext<T extends ComponentDefinition> {
     Component create(Class<T> componentDefinition,
                      Init.None init) {
         checkNotNull(componentDefinition, init);
-        Component c = proxy.createSetupComponent(componentDefinition, init);
-        // Add component as a dependency.
-        ctrl.addDependency(c);
+        Component c = proxy.createDependency(componentDefinition, init);
+
+        // Check that we are in the initial header.
+        ctrl.checkInInitialHeader();
         return c;
     }
 
@@ -240,21 +259,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify allowed mode for this statement.
         ctrl.checkInInitialHeader();
 
-        // We connect any two ports in one of two ways.
-        // 1) If the CUT owns (requires or provides) any of the ports, then
-        // we must have the proxy monitor any such port(s).
-        // 2) Otherwise, we can connect the ports normally.
-        boolean cutOwnsPositive =
-            positive.getPair().getOwner() == cut.getComponentCore();
-        boolean cutOwnsNegative =
-            negative.getPair().getOwner() == cut.getComponentCore();
-
-        if (cutOwnsPositive || cutOwnsNegative)
-            // Case 1) - connect and monitor some port(s).
-            proxy.doConnect(positive, negative, factory);
-        else
-            // Case 2) non monitored ports => connect normally
-            factory.connect((PortCore<P>) positive, (PortCore<P>) negative);
+        factory.connect((PortCore<P>) positive, (PortCore<P>) negative);
 
         return this;
     }
@@ -386,10 +391,9 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that expect statement is valid.
         checkValidPort(eventType, port, direction);
 
-        ctrl.expect(ctrl.createPredicateLabel(eventType,
-                                              predicate,
-                                              port,
-                                              direction));
+        ctrl.expect(
+            ctrl.createPredicateLabel(eventType, predicate, port, direction));
+
         return this;
     }
 
@@ -609,7 +613,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(requestType, requestPort, Direction.OUT);
 
-        ctrl.answerRequest(requestType, requestPort, mapper, responsePort);
+        ctrl.answerRequest(requestType, requestPort.getPair(), mapper, responsePort);
         return this;
     }
 
@@ -637,7 +641,7 @@ public class TestContext<T extends ComponentDefinition> {
         // Verify that the expected event is possible.
         checkValidPort(requestType, requestPort, Direction.OUT);
 
-        ctrl.answerRequest(requestType, requestPort, future);
+        ctrl.answerRequest(requestType, requestPort.getPair(), future);
         return this;
     }
 
@@ -956,37 +960,18 @@ public class TestContext<T extends ComponentDefinition> {
      *  <p>Allowed modes - {@link MODE#BODY BODY}.</p>
      */
     public boolean check() {
-        // Have we run this test case before?
-        if (RUN) {
-            throw new IllegalStateException("test has previously been run");
-        } else {
-            // If no, run it.
-            RUN = true;
-
-            boolean success = ctrl.execute();
-
-            // Shutdown scheduler.
+        try {
+            return ctrl.runFSM().get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } finally {
             scheduler.shutdown();
-
-            return success;
         }
     }
 
     // PRIVATE
-    private void init() {
-        // Create the proxy component for the test case.
-        proxy = new Proxy<T>();
-
-        // Set the default scheduler for components.
-        scheduler = new ThreadPoolScheduler(1);
-        Kompics.setScheduler(scheduler);
-
-        // Send start event to proxy component.
-        ComponentCore proxyComponent = proxy.getComponentCore();
-        proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
-        assert proxyComponent.state() == Component.State.ACTIVE;
-    }
-
     // Verify that expected event is on the CUT's port and
     // that the port type allows the event in the specified
     // direction and if it is an incoming event, then the
@@ -996,23 +981,64 @@ public class TestContext<T extends ComponentDefinition> {
     void checkValidPort(Class<? extends KompicsEvent> eventType,
                         Port<P> port,
                         Direction direction) {
-
-        // An expected event must be on a port provided or required
-        // by the CUT.
-        if (port.getPair().getOwner() != cut.getComponentCore())
+        // An expected event must be on the outside port of the CUT.
+        if (!isCutPort(port)) {
             throw new UnsupportedOperationException("Expecting messages are allowed only on the testing component's ports");
-
-        // If expecting an incoming event, then the port should have
-        // previously been connected to another port - Otherwise no
-        // events can be sent to it.
-        if (direction == Direction.IN && !proxy.portConfig.isConnectedPort(port))
-            throw new IllegalStateException(String.format("Cannot expect incoming message on an unconnected port %s. Check that this port has been connected", port));
+        }
 
         // The port type must allow events of the expected type
         // in the expected direction.
-        if (!proxy.portConfig.portDeclaresEvent(eventType, port, direction))
-            throw new IllegalArgumentException(String.format("Specified port does not declare %s events as %s",
-                eventType.getSimpleName(), direction == Direction.IN ? "incoming" : "outgoing"));
+        if (!portDeclaresEvent(eventType, port, direction)) {
+            throw new IllegalArgumentException(String.format(
+                "The specified port does not declare events of type %s in any direction%n",
+                eventType.getName()
+            ));
+        }
+    }
+
+    private <P extends  PortType>
+    boolean portDeclaresEvent(Class<? extends KompicsEvent> eventType,
+                              Port<P> port,
+                              Direction direction) {
+        P portType = port.getPortType();
+        boolean isProvidedPort =
+            Unsafe.getPositivePorts(cut.getComponentCore()).keySet().contains(portType.getClass());
+
+        // Contains the event types allowed by P's portType in the
+        // specified direction.
+        Collection<Class<? extends KompicsEvent>> allowedTypes;
+
+        // Is this a provided port of the CUT?
+        if (isProvidedPort) {
+            // If yes, Negative events are incoming to P while
+            // Positive events are outgoing from P.
+            if (direction == IN) {
+                allowedTypes = Unsafe.getNegativeEvents(portType);
+            } else {
+                allowedTypes = Unsafe.getPositiveEvents(portType);
+            }
+        } else {
+            // Otherwise, Positive events are incoming to P while
+            // Negative events are outgoing from P.
+            if (direction == IN) {
+                allowedTypes = Unsafe.getPositiveEvents(portType);
+            } else {
+                allowedTypes = Unsafe.getNegativeEvents(portType);
+            }
+        }
+
+        // Return true if the specified eventType is allowed.
+        for (Class<? extends KompicsEvent> type : allowedTypes) {
+            if (type.isAssignableFrom(eventType)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isCutPort(Port<?> p) {
+        return p.getPair().getOwner() == cut.getComponentCore();
     }
 
     // Throw an error if any provided object is null.

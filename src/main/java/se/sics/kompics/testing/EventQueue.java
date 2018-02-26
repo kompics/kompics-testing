@@ -21,31 +21,19 @@
 package se.sics.kompics.testing;
 
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 
 class EventQueue {
+    private final LinkedBlockingDeque<EventSymbol> q = new LinkedBlockingDeque<EventSymbol>();
 
-  private long timeoutMS = TestContext.timeout;
-  private final LinkedBlockingDeque<EventSymbol> q = new LinkedBlockingDeque<EventSymbol>();
-
-  void setTimeout(long timeout) {
-    this.timeoutMS = timeout;
-  }
-
-  void offer(EventSymbol event) {
-    q.offer(event);
-  }
-
-  void addFirst(EventSymbol event) {
-    q.addFirst(event);
-  }
-
-  EventSymbol poll() {
-    try {
-      return q.poll(timeoutMS, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-      return null;
+    void offer(EventSymbol event) {
+        q.offer(event);
     }
-  }
+
+    void addFirst(EventSymbol event) {
+        q.addFirst(event);
+    }
+
+    EventSymbol poll() {
+        return q.poll();
+    }
 }

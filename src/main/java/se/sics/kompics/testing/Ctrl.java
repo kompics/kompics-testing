@@ -31,23 +31,34 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Semaphore;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 
 import com.google.common.base.Supplier;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import org.slf4j.Logger;
 
-import se.sics.kompics.Component;
 import se.sics.kompics.ComponentCore;
 import se.sics.kompics.ComponentDefinition;
+import se.sics.kompics.ControlPort;
+import se.sics.kompics.Direct;
 import se.sics.kompics.Fault;
+import se.sics.kompics.Handler;
 import se.sics.kompics.JavaComponent;
+import se.sics.kompics.JavaPort;
 import se.sics.kompics.PortType;
 import se.sics.kompics.Port;
 import se.sics.kompics.KompicsEvent;
 import se.sics.kompics.Start;
+import se.sics.kompics.Unsafe;
 
+import static se.sics.kompics.testing.Direction.IN;
+import static se.sics.kompics.testing.Direction.OUT;
 import static se.sics.kompics.testing.MODE.*;
 import static se.sics.kompics.testing.Block.STAR;
 
@@ -59,22 +70,15 @@ class Ctrl<T extends ComponentDefinition> {
     private static final Logger logger = TestContext.logger;
 
     // ComponentDefinition of the CUT.
-    private final T definitionUnderTest;
+    private T definitionUnderTest;
 
-    /**
-     * Queue of observed event symbols {@link se.sics.kompics.testing.EventSymbol}
-     * */
-    private final EventQueue eventQueue;
-
-    // Track if we have previously run the testcase.
-    private boolean STARTED = false;
+    // The result of running this testcase.
+    private SettableFuture<Boolean> result;
 
     /** The {@link Proxy} for this testcase  */
-    private final ComponentCore proxyComponent;
+    private ComponentCore proxyComponent;
 
-    // Component dependencies for this test case. This consists of
-    // the CUT and all of its peers.
-    private Collection<Component> dependencies = new HashSet<Component>();
+    private long timeoutMS = TestContext.timeout;
 
     /**
      *  Collect the answerRequest statements in a
@@ -126,32 +130,17 @@ class Ctrl<T extends ComponentDefinition> {
      */
     private int balancedEnd = 0;
 
-    Ctrl(Proxy<T> proxy, T definitionUnderTest) {
-        // Store the event symbol queue.
-        eventQueue = proxy.getEventQueue();
-
-        // Store the CUT.
-        proxyComponent = proxy.getComponentCore();
-
-        // Initialize the CUT component definition.
-        this.definitionUnderTest = definitionUnderTest;
-
+    Ctrl() {
         // Begin the test specification in the initial-header mode.
         previousMode.push(HEADER);
     }
 
-    /**
-     *  Add a dependency component to the test case.
-     *  Dependencies are sent the start event only after
-     *  {@link #proxyComponent} has been started and before the
-     *  NFA is executed.
-    */
-    void addDependency(Component c) {
-        // Verify that we are in the initial-header.
-        checkInInitialHeader();
+    void setProxyComponent(ComponentCore proxyComponent) {
+        this.proxyComponent = proxyComponent;
+    }
 
-        // Add the component to the dependency list.
-        dependencies.add(c);
+    void setDefinitionUnderTest(T definitionUnderTest) {
+        this.definitionUnderTest = definitionUnderTest;
     }
 
     // Black-list events matched by this label within the current block.
@@ -615,11 +604,11 @@ class Ctrl<T extends ComponentDefinition> {
         checkInInitialHeader();
 
         // Timeout value must be non-negative.
-        if (timeoutMS < 0)
-            throw new IllegalStateException("Negative timeout");
+        if (timeoutMS < 0) {
+            throw new IllegalStateException("Timeout value must be non-negative.");
+        }
 
-        // Set the event queue's timeout value.
-        eventQueue.setTimeout(timeoutMS);
+        this.timeoutMS = timeoutMS;
     }
 
     // Throw an exception if we are not currently in the  initial header.
@@ -641,6 +630,12 @@ class Ctrl<T extends ComponentDefinition> {
         // Set a comparator for comparing events of this
         // type if one was registered.
         Comparator<E> c = (Comparator<E>) comparators.get(event.getClass());
+
+        // Because the user always specifies an `outside` port,
+        // for incoming events, we make sure we are comparing
+        // with the `inside` port when matching an event.
+        port = port.getPair();
+
         return new EventLabel((E) event, port, direction, c);
     }
 
@@ -664,106 +659,373 @@ class Ctrl<T extends ComponentDefinition> {
                                     Predicate<E> predicate,
                                     Port<? extends PortType> port,
                                     Direction direction) {
+        // Because the user always specifies an `outside` port,
+        // for incoming events, we make sure we are comparing
+        // with the `inside` port when matching an event.
+        port = port.getPair();
+
         return new EventLabel(eventType, predicate, port, direction);
     }
 
     // Run this test case.
-    boolean execute() {
-        // Have we run this test case previously?
-        if (STARTED)
-            return false;
+    ListenableFuture<Boolean> runFSM() {
 
         // Verify that no all blocks are balanced.
-        if (balancedEnd != 0)
+        if (balancedEnd != 0) {
             throw new IllegalStateException("Unbalanced block");
+        }
 
-        // Flag this test case has been run.
-        STARTED = true;
+        // Have we run this test case previously?
+        if (result != null) {
+            SettableFuture<Boolean> future = SettableFuture.create();
+            future.setException(new IllegalStateException("State machine has previously been executed"));
+            return future;
+        }
 
-        // Send start event to all specified components in the test case.
-        initializeDependencies();
-
-        // Return true if the test case passed.
-        return run();
-    }
-
-    // Run the test case and return true if it passed.
-    private boolean run() {
-        // Construct our NFA.
         table.construct();
 
-        // We always try to
-        while (true) {
-            // See if we are not expecting any events to occur and if so,
-            // perform any internal transitions from our current states.
-            table.tryInternalEventTransitions();
+        result = SettableFuture.create();
 
-            // If we already ended up in an error state,
-            // then return immediately.
-            if (table.inErrorState())
-                return false;
+        // Send start event to proxy (and all child components).
+        proxyComponent.getControl().doTrigger(Start.event, 0, proxyComponent);
 
-            // Wait for an event to be observed.
-            EventSymbol eventSymbol = eventQueue.poll();
+        // Start event timeout.
+        rescheduleEventTimeout();
 
-            // If no more events were observed and we are in the
-            // final state, then the test case passes.
-            if (eventSymbol == null && table.isInFinalState())
-                return true;
-
-            // Otherwise, we either have an event that needs to be matched or
-            // we might need to perform some internal transition(s).
-            boolean successful = table.doTransition(eventSymbol);
-
-            // If we were not successful, then either
-            // 1) The event was null.
-            // 2) The event could not be matched successfully.
-            // 3) Some internal transition has caused us to fail.
-            // in 1) we may have ended up in the final state
-            // while in 2) and 3) we must always fail the test case.
-            if (!successful)
-                return testCasePassed(eventSymbol);
-        }
+        return result;
     }
 
-    // Return true if the test cases has passed given the observed event.
-    private boolean testCasePassed(EventSymbol eventSymbol) {
-        // If we ended up in the final state and no event was observed
-        // then the test case passed.
-        if (eventSymbol == null && table.isInFinalState()) {
-            // Wait for any pending events to be handled by the CUT
-            checkWorkCount();
+    private EventQueue eventQueue = new EventQueue();
+    private Semaphore semaphore = new Semaphore(1);
+    public boolean doTransition(KompicsEvent event, Port<?> port, Direction direction) {
+        return doTransition(new EventSymbol(event, port, direction));
+    }
+
+    public boolean doTransition(EventSymbol eventSymbol) {
+        KompicsEvent event = eventSymbol.getEvent();
+        Port port = eventSymbol.getPort();
+        Direction direction = eventSymbol.getDirection();
+
+        boolean isFault = isComponentFaultEvent(eventSymbol);
+
+        // Are we supposed to ignore this event?
+        if (portIsIgnored(port) && !isFault) {
             return true;
         }
 
-        // Otherwise we have observed an event unmatchable event and
-        // must fail the test case.
+        // Has this test case already ended?
+        if (testcaseTerminated()) {
+            // If yes, then we can not do anything with it.
+            return false;
+        }
 
-        // If this event is an exception caught by the framework,
-        // then log the exception to stdErr before failing.
-        logException(eventSymbol);
+        // We need to handle incoming Direct Requests specially.
+        if (direction == IN && event instanceof Direct.Request) {
+            setupResponsePortForIncomingRequest((Direct.Request) event, port);
+        }
 
-        // The test failed.
+        // Add the event to the queue.
+        if (isFault) {
+            // Since we want to immediately assert that an exception
+            // was thrown while executing some handler, we add Fault
+            // events to the queue's head.
+            eventQueue.addFirst(eventSymbol);
+        } else {
+            eventQueue.offer(eventSymbol);
+        }
+
+        // Try to acquire the lock and do transitions.
+        boolean hasLock = semaphore.tryAcquire();
+        try {
+            // If we are able to acquire the lock then we can
+            // transition the fsm.
+            if (hasLock && !result.isDone()) {
+                doEventTransitions();
+            }
+
+            if (!testcaseTerminated()) {
+                // Always reschedule timeout on any observed event.
+                rescheduleEventTimeout();
+            }
+        } finally {
+            // Release lock after rescheduling a new timeout so it is visible to
+            // any previous timeout.
+            if (hasLock) {
+                semaphore.release();
+            }
+        }
+
+        // We always queue the event and trigger later.
         return false;
     }
 
-    // Print an error message to stdErr if the provided event is
-    // a fault event.
-    private void logException(EventSymbol eventSymbol) {
-        if (eventSymbol != null
-            && eventSymbol.getEvent() instanceof Fault
-            && eventSymbol.getPort() == definitionUnderTest.getControlPort())
-            logger.error("Uncaught Exception [{}]", eventSymbol.getEvent());
+    private boolean portIsIgnored(Port<?> port) {
+        // Return true if we should not observe events on this port.
+        return port.getPortType().getClass() == ControlPort.class;
     }
 
-    // Wait for any pending events to be handled by the CUT
-    private void checkWorkCount() {
-        JavaComponent cut = (JavaComponent) proxyComponent;
-        while (cut.workCount.get() > 0) {
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    private boolean isComponentFaultEvent(EventSymbol eventSymbol) {
+        return eventSymbol.getPort().getPortType().getClass() == ControlPort.class
+            && eventSymbol.getEvent() instanceof Fault;
+    }
+
+    private boolean doEventTransitions() {
+        // Set to true if we manage to follow any transition
+        // based on an observed event.
+        boolean transitioned = false;
+
+        EventSymbol eventSymbol;
+        while ((eventSymbol = eventQueue.poll()) != null) {
+            transitioned = true;
+
+            // Try any internal events first.
+            lastTransition = table.tryInternalEventTransitions();
+
+            // If we end up in an error state, then return immediately
+            // otherwise try to match the event.
+            if (lastTransition == null || !lastTransition.inErrorState) {
+                lastTransition = table.doTransition(eventSymbol);
+            }
+
+            if (lastTransition.inErrorState) {
+                completeTestcaseResult(false);
+                break;
+            }
+
+            // Forward the event if needed.
+            if (lastTransition.forwardEvent) {
+                eventSymbol.forwardEvent();
+            }
+        }
+
+        return transitioned;
+    }
+
+    private long latestScheduledTimeout;
+    private TimerTask eventTimerTask;
+    private final Timer eventTimer = new Timer("kompics-testing-event-timer");
+    private TransitionResult lastTransition;
+    private void rescheduleEventTimeout() {
+        // The timestamp for this timeout task.
+        final long timestamp = System.currentTimeMillis();
+
+        // Cancel the previous timeout task.
+        if (eventTimerTask != null) {
+            eventTimerTask.cancel();
+        }
+
+        // Create the event task and mark as the latest.
+        latestScheduledTimeout = timestamp;
+        eventTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    endTestcase(timestamp);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    eventTimer.cancel();
+                    completeTestcaseResult(false);
+                }
+            }
+        };
+
+        try {
+            eventTimer.schedule(eventTimerTask, timeoutMS);
+        } catch (IllegalStateException ignored) {
+            // If timeout is already cancelled.
+        }
+    }
+
+    private void endTestcase(long scheduledTimeout) {
+        try {
+            semaphore.acquire();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            // If the testcase has already completed or a new timeout task
+            // has already been scheduled (since we woke up) then we don't do
+            // anything.
+            if (testcaseTerminated() || latestScheduledTimeout != scheduledTimeout) {
+                return;
+            }
+
+            // We try to make some progress and if unable to,
+            // then we end the testcase.
+            // Did we perform any transitions during this timeout?
+            if (makeProgress()) {
+                // If yes, then we reschedule the event timeout for next time.
+                rescheduleEventTimeout();
+            } else {
+                // Otherwise we end the test case based on the last transition made if any.
+                if (lastTransition != null) {
+                    completeTestcaseResult(
+                        !lastTransition.inErrorState && lastTransition.inFinalState);
+                } else {
+                    // No events were received for this test case.
+                    completeTestcaseResult(false);
+                    eventTimer.cancel();
+                }
+            }
+        } finally {
+            semaphore.release();
+        }
+    }
+
+    private boolean makeProgress() {
+        // Make progress on the fsm by following as
+        // many transitions as allowed.
+        // First we 1) try to take observed event
+        // transitions followed by 2) internal transitions.
+        // Force an event transitions only if both alternatives fail.
+
+        boolean madeProgress = false;
+        boolean performedTransition;
+        do {
+            // First we try to clear the event queue for any observed
+            // events yet to be handled.
+            boolean hadPendingEvents = doEventTransitions();
+            // If this led to the test case terminating, then we're done.
+            if (testcaseTerminated()) {
+                break;
+            }
+
+            // Next, we can always try to perform internal
+            // transitions if we are not expecting an event.
+            TransitionResult internalTransition = table.tryInternalEventTransitions();
+            if (internalTransition != null) {
+                lastTransition = internalTransition;
+                if (setResultIfInErrorState(internalTransition)) {
+                    break;
+                }
+            } else if (!hadPendingEvents && !madeProgress){
+                // We have been are unable to perform any transitions at all
+                // so we try to force an internal transition.
+                internalTransition = table.performInternalEventTransitions();
+                if (internalTransition != null) {
+                    lastTransition = internalTransition;
+                    if (setResultIfInErrorState(internalTransition)) {
+                        break;
+                    }
+                }
+            }
+
+            performedTransition = hadPendingEvents || internalTransition != null;
+            madeProgress |= performedTransition;
+        } while (performedTransition);
+
+        return madeProgress;
+    }
+
+    private boolean setResultIfInErrorState(TransitionResult tResult) {
+        if (tResult.inErrorState) {
+            result.set(false);
+        }
+        return tResult.inErrorState;
+    }
+
+    private void completeTestcaseResult(boolean testcaseResult) {
+        if (!testcaseTerminated()) {
+            result.set(testcaseResult);
+        }
+    }
+
+    private boolean testcaseTerminated() {
+        return result.isDone();
+    }
+
+    /**
+     *  For a new incoming Direct.Request event R, we replace R's origin
+     *  port O with a custom port P and save P for any future
+     *  events originating from O.
+     */
+    private final Map<Port, JavaPort> originToResponsePort =
+        new HashMap<Port, JavaPort>();
+    /**
+     *  For incoming {@link Direct.Request} events, responses are
+     *  normally triggered directly on the origin port.
+     *
+     *  We instead make sure that the response is
+     *  routed back onto a custom port instead, after which the
+     *  response can be forwarded if needed.
+     *
+     *  This works by creating the custom (response) port G for an
+     *  incoming request R and replacing R's origin with G.
+     *  Special handlers are subscribed to G that intercept R's response.
+     *
+     *  To prevent G being created every time an event from the
+     *  same origin O is received, we store G in {@link #originToResponsePort}.
+     */
+    private <P extends PortType>
+    void setupResponsePortForIncomingRequest(Direct.Request<?> request,
+                                             Port<P> port) {
+        Port origin = Unsafe.getOrigin(request);
+
+        if (origin == null) {
+            logger.warn("Origin port was Null for incoming request [{}].", request);
+            return;
+        }
+
+        JavaPort<P> responseOutsidePort = originToResponsePort.get(origin);
+
+        if (responseOutsidePort == null) {
+            responseOutsidePort = Unsafe.createJavaPort(true, port.getPortType(), proxyComponent);
+            JavaPort<P> responseInsidePort =
+                Unsafe.createJavaPort(true, port.getPortType(), proxyComponent);
+            responseOutsidePort.setPair(responseInsidePort);
+            responseInsidePort.setPair(responseOutsidePort);
+            subscribeResponseHandlers(origin, port, responseInsidePort);
+        }
+
+        Unsafe.setOrigin(request, responseOutsidePort);
+    }
+
+    // Subscribe a custom handler on the (inside) response port for
+    // each possible response type
+    private <P extends PortType>
+    void subscribeResponseHandlers(final Port origin, final Port<P> CUTOutsidePort, JavaPort<P> responseInsidePort) {
+        // Get the allowed types on the origin port.
+        Collection<Class<? extends KompicsEvent>> insidePortEvents =
+            Unsafe.getPositiveEvents(origin.getPortType());
+
+        for (final Class<? extends KompicsEvent> eventType : insidePortEvents) {
+            // Skip non response event types.
+            if (!Direct.Response.class.isAssignableFrom(eventType)) {
+                continue;
+            }
+
+            // Only add handlers to super types so that we don't receive
+            // an event multiple times.
+            boolean isSuperType = true;
+            // If this is a subtype of some other response type - skip.
+            for (Class<? extends KompicsEvent> other : insidePortEvents) {
+                if (eventType != other && other.isAssignableFrom(eventType)) {
+                    isSuperType = false;
+                    break;
+                }
+            }
+
+            if (isSuperType) {
+                responseInsidePort.doSubscribe(new Handler() {
+                    {
+                        setEventType(eventType);
+                    }
+
+                    @Override
+                    public void handle(KompicsEvent response) {
+                        EventSymbol eventSymbol = new EventSymbol(
+                            response, CUTOutsidePort, OUT
+                        );
+
+                        // Set the origin as the destination port
+                        // for the response.
+                        eventSymbol.setForwardingPort(origin);
+
+                        // Do transition for response.
+                        doTransition(eventSymbol);
+                    }
+                });
             }
         }
     }
@@ -805,14 +1067,6 @@ class Ctrl<T extends ComponentDefinition> {
             String.format("Current Modes was [%s]. Allowed Modes for this statement is %s",
                           currentMode,
                           Arrays.toString(expectedModes)));
-    }
-
-    // Sends start events to all components participating in the test case.
-    private void initializeDependencies() {
-        logger.trace("Sending Start to {} participant component(s)", dependencies.size());
-        for (Component child : dependencies) {
-            child.getControl().doTrigger(Start.event, 0, proxyComponent);
-        }
     }
 
     // Wrapper class to look up comparator for given event class.

@@ -7,9 +7,8 @@ import se.sics.kompics.PortType;
 /**
  *  Represents an 'external' event performed by a component under test CUT.
  *  An external event is a triple (e,p,d) where e is the KompicsEvent instance
- *  observed/intercepted by a {@link ProxyHandler}, p is the port on
- *  which e occurred and d is the direction (incoming or outgoing) of e
- *  with respect to the CUT.
+ *  observed, p is the port on which e occurred and d is the direction
+ *  (incoming or outgoing) of e with respect to the CUT.
  *  @see EventSymbol#event
  *  @see EventSymbol#port
  *  @see EventSymbol#direction
@@ -25,28 +24,43 @@ class EventSymbol {
     // The event's direction with respect to the CUT.
     private final Direction direction;
 
-    // The handler that observed this event.
-    private final ProxyHandler handler;
+    // If set, the intercepted event will be forwarded
+    // on this port instead of the port on which the event
+    // was observed.
+    private Port forwardingPort;
 
     // Set to true if event should be forwarded to its recipient(s).
     private boolean forwardEvent = true;
 
     EventSymbol(KompicsEvent event,
                 Port<? extends PortType> port,
-                Direction direction,
-                ProxyHandler handler) {
+                Direction direction) {
         this.event = event;
         this.port = port;
         this.direction = direction;
-        this.handler = handler;
+    }
+
+    void setForwardingPort(Port forwardingPort) {
+        this.forwardingPort = forwardingPort;
     }
 
     // Forward the event associated with this symbol.
     void forwardEvent() {
-        if (forwardEvent) {
-            handler.forwardEvent(event);
-             // forward event exactly once
-            forwardEvent = false;
+        if (!forwardEvent) {
+            return;
+        }
+
+        // forwardinPort overrides the default port if provided.
+        Port p = forwardingPort != null
+            ? forwardingPort
+            : port;
+
+        // forward event exactly once
+        forwardEvent = false;
+        if (direction == Direction.IN) {
+            p.deliverIncoming(event);
+        } else {
+            p.deliverOutgoing(event);
         }
     }
 
@@ -62,10 +76,6 @@ class EventSymbol {
         return direction;
     }
 
-    ProxyHandler getHandler() {
-        return handler;
-    }
-
     void setForwardEvent(boolean forwardEvent) {
         this.forwardEvent = forwardEvent;
     }
@@ -75,7 +85,7 @@ class EventSymbol {
     }
 
     static final EventSymbol EPSILON = new EventSymbol(
-        new KompicsEvent() { }, null, null, null) {
+        new KompicsEvent() { }, null, null) {
         @Override
         public String toString() {
             return "EPSILON";

@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.Stack;
 
 class NFA {
-
     // Next available ID for a new state.
     private int stateId = 1;
 
@@ -174,7 +173,7 @@ class NFA {
     }
 
     // Return true if we are in the final state of the NFA.
-    boolean isInFinalState() {
+    private boolean isInFinalState() {
         for (State state : currentStates) {
             if (state.isFinalState) {
                 return true;
@@ -184,7 +183,7 @@ class NFA {
     }
 
     // Return true if we are currently in the error state.
-    boolean inErrorState() {
+    private boolean inErrorState() {
         return currentStates.size() == 1 && currentStates.contains(errorState);
     }
 
@@ -194,12 +193,8 @@ class NFA {
         currentStates.add(errorState);
     }
 
-    boolean doTransition(EventSymbol eventSymbol) {
-        // log
-        if (eventSymbol == null)
-            logger.trace("{}: observed NULL", currentStates);
-        else
-            logger.debug("{}: observed event [{}]",  currentStates, eventSymbol);
+    TransitionResult doTransition(EventSymbol eventSymbol) {
+        logger.debug("{}: observed event [{}]",  currentStates, eventSymbol);
 
         while (true) {
             // Check if we are supposed to perform an internal transition before
@@ -207,101 +202,101 @@ class NFA {
             // If no state in our current states set C expects to match an event symbol, i.e-
             // 'all' states in C are active states, then perform the internal transitions
             // associated with these active states and move to next states.
-            tryInternalEventTransitions();
+            TransitionResult tResult = tryInternalEventTransitions();
 
             // Return if in error state
-            if (inErrorState())
-                return false;
+            if (tResult != null && tResult.inErrorState) {
+                return tResult;
+            }
 
-            // Set of states N reachable from current states C
-            Set<State> nextStates = new HashSet<State>();
 
-            // Check if this symbol can be matched by any state in C.
-            // If a current state S matches the symbol, add S to nextStates
-            if (eventSymbol != null)
-                tryStateTransitions(eventSymbol, nextStates);
+            // Check if this symbol is matched by any state in the set of
+            // current states C and set C to the set of next states for matching
+            // transitions.
+            tResult = tryStateTransitions(eventSymbol);
 
-            // If we have landed in some next state(s) return
-            if (!nextStates.isEmpty())
-                return !inErrorState();
+            if (tResult != null) {
+                return tResult;
+            }
 
             // We are still unable to match eventSymbol.
             // Force internal transitions by performing the internal transition
             // associated with each active state S in the set of current states C.
             // Kill the state thread for all non-active states in C.
-            performInternalEventTransitions(nextStates);
-            // If we found any active states and successfully landed in some next state(s) N,
-            // update C to N, then try matching event symbol again.
-            if (!nextStates.isEmpty()) {
-                logger.trace("internal transition(s) found");
-                updateCurrentState(nextStates);
+            tResult = performInternalEventTransitions();
 
-                if (eventSymbol == null) {
-                    // We performed some transition(s) and there wasn't any event symbol to match
-                    return !inErrorState();
-                } else {
-                    continue;
-                }
+            // If we found any active states and successfully landed in some next state(s),
+            // then try matching event symbol again.
+            if (tResult != null) {
+                continue;
             }
-
-            // We are still not able to perform any
-            // transitions from the current states.
 
             logger.trace("No internal transition(s) found");
-
-            // If there isn't any event symbol to match, we do nothing.
-            if (eventSymbol == null) {
-                logger.info("No event was received");
-                return false;
-            }
-
             // We have an event to match but are unable to
             // follow any transitions from the current states.
             // So we default to checking for any registered actions that
             // may match the event.
             logger.trace("trying default actions");
-            boolean handled = handleWithDefaultAction(eventSymbol);
-            if (handled) {
-                // Did we end up in the error state?
-                // This will happen if the default action is to fail the test case.
-                return !inErrorState();
+            Action action = getDefaultAction(eventSymbol);
+
+            // No default action for event.
+            if (action == null) {
+                // We still are unable to match event symbol even with default actions.
+                logger.error("Event {} was not matched", eventSymbol);
+                gotoErrorState();
+                return transitionResult(false);
             }
 
-            // We still are unable to match event symbol even with default actions.
-            logger.error("Event {} was not matched", eventSymbol);
-            return false;
+            // We successfully matched this event using a default action.
+            switch (action) {
+                case FAIL:
+                    // We were requested to fail the test case,
+                    // Set current state to error state.
+                    gotoErrorState();
+                    logger.error("Default action for observed event {} was [{}]", eventSymbol, Action.FAIL);
+                    return transitionResult(false);
+                case HANDLE:
+                    // We were requested to forward this event.
+                    return transitionResult(true);
+                case DROP:
+                    // We were requested to drop this event.
+                    return transitionResult(false);
+            }
         }
     }
 
     // While 'all' states S in the current states C are active-states, i.e no
     // external events are expected, perform the internal transition associated with
     // each such S and update C to the next reachable states.
-    void tryInternalEventTransitions() {
+    TransitionResult tryInternalEventTransitions() {
+        TransitionResult tResult = null;
         while (true) {
             // if some state thread in the NFA expects an event,
-            // do nothing.
+            // return the last transition we took if any.
             for (State state : currentStates) {
-                if (!state.canPerformInternalTransition())
-                    return;
+                if (!state.canPerformInternalTransition()) {
+                    return tResult;
+                }
             }
 
             // all S in current states C are active-states.
             // Note: If C is not a singleton set, then test specification is ambiguous.
 
-            // reachable states from C
-            Set<State> nextStates = new HashSet<State>();
-            performInternalEventTransitions(nextStates);
-
-            // update current states C to reachable states
-            assert !nextStates.isEmpty();
-            updateCurrentState(nextStates);
+            tResult = performInternalEventTransitions();
+            assert tResult != null;
         }
+    }
+
+    private TransitionResult transitionResult(boolean send) {
+        return new TransitionResult(send, isInFinalState(), inErrorState());
     }
 
     // For each state S in the current states such that S currently can perform
     // an internal transition t, perform t and add the destination state of t
-    // to the provided set.
-    private void performInternalEventTransitions(Set<State> nextStates) {
+    // to the next states. Update the current states to the next states.
+    // Return null if no such S exists.
+    TransitionResult performInternalEventTransitions() {
+        Set<State> nextStates = new HashSet<State>();
         for (State state : currentStates) {
             if (state.canPerformInternalTransition()) {
                 // perform internal transition associated with this active state.
@@ -311,13 +306,21 @@ class NFA {
                 nextStates.add(t.nextState);
             }
         }
+        if (nextStates.isEmpty()) {
+            return null;
+        } else {
+            updateCurrentState(nextStates);
+            return transitionResult(false);
+        }
     }
 
-    // Given an event symbol e, find all states s in the set of current states C such
-    // that s has a set of (matching) transitions T that match e. Add each matching
-    // transition's destination state to the provided set of nextStates N.
+    // Given an event symbol e, find all states s in the set of currentStates C such
+    // that s has a set of transitions T that match e. Add each matching
+    // transition's destination state to the set of nextStates N.
     // Finally, update the C to N if any matching transition was found.
-    private void tryStateTransitions(EventSymbol eventSymbol, Set<State> nextStates) {
+    // Returns null if this event symbol was not matched.
+    private TransitionResult tryStateTransitions(EventSymbol eventSymbol) {
+        Set<State> nextStates = new HashSet<>();
         // Matching transitions.
         Set<Transition> transitions = new HashSet<Transition>();
 
@@ -331,20 +334,23 @@ class NFA {
         }
 
         // Did we find any matching transitions?
-        if (!nextStates.isEmpty()) {
-            // If we did, kill NFA threads for unmatched transitions and
-            // set our new current state to next states
-            updateCurrentState(nextStates);
+        if (nextStates.isEmpty()) {
+            return null;
+        }
 
-            // Does any of our matching transitions require the event symbol to be forwarded?
-            for (Transition t : transitions) {
-                if (t.forwardEvent) {
-                    // If yes, forward at most once.
-                    eventSymbol.forwardEvent();
-                    return;
-                }
+        // If we did, kill NFA threads for unmatched transitions and
+        // set our new current state to next states
+        updateCurrentState(nextStates);
+
+        // Does any of our matching transitions require the event symbol to be forwarded?
+        for (Transition t : transitions) {
+            if (t.forwardEvent) {
+                // Mark event to be forwarded.
+                return transitionResult(true);
             }
         }
+        // Mark event to not be forwarded.
+        return transitionResult(false);
     }
 
     private void updateCurrentState(Set<State> nextStates) {
@@ -392,29 +398,6 @@ class NFA {
         }
     }
 
-    // Check if any default action matching this event was registered.
-    // If found, handle the event as requested and return true.
-    private boolean handleWithDefaultAction(EventSymbol eventSymbol) {
-        Action action = getDefaultAction(eventSymbol);
-
-        // No default action for event.
-        if (action == null)
-            return false;
-
-        // We successfully matched this event using a default action.
-        if (action == Action.FAIL) {
-            // We were requested to fail the test case,
-            // Set current state to error state.
-            gotoErrorState();
-            logger.error("Default action for observed event {} was {}", eventSymbol, Action.FAIL);
-        } else if (action == Action.HANDLE) {
-            // We were requested to forward this event.
-            eventSymbol.forwardEvent();
-        }
-
-        return true;
-    }
-
     // Return a registered default Action, if any, for this event symbol.
     private Action getDefaultAction(EventSymbol eventSymbol) {
         // Return immediately if event is null.
@@ -445,7 +428,7 @@ class NFA {
     private <E extends KompicsEvent>
     Action getDefaultActionHelper(KompicsEvent event,
                                   Map.Entry<Class<? extends KompicsEvent>,
-																	Function<? extends KompicsEvent, Action>> match) {
+                                  Function<? extends KompicsEvent, Action>> match) {
         Function<E, Action> function = (Function<E, Action>) match.getValue();
         Action action = function.apply((E) event);
 
@@ -514,7 +497,6 @@ class NFA {
 
         logger.trace("========================");
     }
-
 
   /*
    *
@@ -969,14 +951,16 @@ class NFA {
 
             // Don't transition out of completed loop on event.
             // This would be done later on if necessary so do nothing this time.
-            if (isEndOfLoop() && !block.hasPendingEvents())
+            if (isEndOfLoop() && !block.hasPendingEvents()) {
                 return match;
+            }
 
             // Can we match this event symbol using any
             // enclosing blockExpect statements.
-            if (block.match(eventSymbol))
+            if (block.match(eventSymbol)) {
                 // If yes, we forward the event and stay in the same state.
                 match.add(selfTransitionAndForward);
+            }
 
             // Did we find any match for this event?
             if (match.isEmpty()) {
@@ -1178,9 +1162,10 @@ class NFA {
          */
         Transition getLoopEndTransition() {
             // Are we waiting for some events to occur within our current block B?
-            if (block.hasPendingEvents())
+            if (block.hasPendingEvents()) {
                 // If yes, Case 1: do not transition out of this state.
                 return selfTransitionAndDrop;
+            }
 
             // Otherwise, we can safely exit this state.
             logger.trace("end{} count = {}", block, block.getCurrentCount());

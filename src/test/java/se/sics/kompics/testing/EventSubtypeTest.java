@@ -38,30 +38,32 @@ public class EventSubtypeTest {
 
   @Test
   public void test1() {
-    TestContext<AComp> tc = TestContext.newInstance(AComp.class);
-    Component comp = tc.getComponentUnderTest();
-    Port<APort> port = comp.getNegative(APort.class);
+      TestContext<AComp> tc = TestContext.newInstance(AComp.class);
+      Component comp = tc.getComponentUnderTest();
+      Port<APort> port = comp.getNegative(APort.class);
+      EventA eventA = new EventA();
+      tc.body()
+          .trigger(eventA, port)
+          .expect(eventA, port, Direction.IN)
+          .expect(EventInterface.class, eventB1(), port, Direction.OUT);
 
-    tc = tc.body()
-      .trigger(new EventA(), port)
-      .expect(EventInterface.class, eventB1(), port, Direction.OUT)
-      .repeat(1).body().end();
-
-    assertTrue(tc.check());
+      assertTrue(tc.check());
   }
   
   @Test
   public void test2() {
-    TestContext<AComp> tc = TestContext.newInstance(AComp.class);
-    Component comp = tc.getComponentUnderTest();
-    Port<APort> port = comp.getNegative(APort.class);
+      TestContext<AComp> tc = TestContext.newInstance(AComp.class);
+      Component comp = tc.getComponentUnderTest();
+      Port<APort> port = comp.getNegative(APort.class);
+      EventA eventA = new EventA();
 
-    tc = tc.body()
-      .trigger(new EventA(), port)
-      .expect(EventB.class, eventB2(), port, Direction.OUT)
-      .repeat(1).body().end();
+      tc.body().
+          trigger(eventA, port)
+          .expect(eventA, port, Direction.IN)
+          .expect(EventB.class, eventB2(), port, Direction.OUT)
+      ;
 
-    assertTrue(tc.check());
+      assertTrue(tc.check());
   }
 
   Predicate<EventInterface> eventB1() {
