@@ -1,5 +1,6 @@
 # KompicsTesting 
 [ ![Download](https://api.bintray.com/packages/kompics/Maven/kompics-testing/images/download.svg) ](https://bintray.com/kompics/Maven/kompics-testing/_latestVersion)
+
 A unit testing framework for components in [Kompics](http://kompics.sics.se/).
 
 # Documentation
@@ -11,7 +12,7 @@ The release documentation can be found [here](http://kompics.sics.se/current/tut
 
 ### Dependencies
 Kompics testing artefacts are hosted on bintray.
-To fecth them, add the following to either your maven `settings.xml` or your projects `pom.xml`:
+To fetch them, add the following to either your maven `settings.xml` or your projects `pom.xml`:
 ```xml
 <repositories>
     <repository>
